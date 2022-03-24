@@ -231,8 +231,9 @@ void check_tile(Tile *tile)
         txt->scale = tile->img->scale*1.25f;
         //auto *txt2 = text_for_img(std::to_string(touching), tile->img);
         //txt2->scale = tile->img->scale*1.25f;
-        auto *img = img_for_text(txt);
-        img->tint = Vector4((float)rand()/RAND_MAX, (float)rand()/RAND_MAX, (float)rand()/RAND_MAX, 1);
+        //auto *img = img_for_text(txt);
+        //img->scale /= 1.25f;
+        //img->tint = Vector4(touching*(0.125f), touching*0.125f*0.5f, touching*0.125f*0.5f, 1.f);
         tile->text = txt;
         logmsg("text: %o\n", txt->text);
     }

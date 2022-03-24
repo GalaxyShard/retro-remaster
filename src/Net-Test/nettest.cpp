@@ -428,15 +428,15 @@ NetTest::NetTest()
         // MAKE SURE TO REPLACE OBJ WITH ENTITIES FOR CULLING
 
         Entity testEntity = Entity::create(*ECSManager::main);
-        testEntity.add_comp(ObjRendererECS{
-            .mesh = cube.get(),
-            .mat = collisionMat.get()
-        }, *ECSManager::main);
+        ObjRendererECS render;
+        render.mesh = cube.get();
+        render.mat = collisionMat.get();
+        testEntity.add_comp(render, *ECSManager::main);
         TransformECS transform;
         for (int j = 0; j < 3; ++j)
-            transform.i_pos[j] = ((float)rand() / RAND_MAX * spread - spread/2);
+            transform.i_pos[j] = ((float)rand() / (float)RAND_MAX * spread - spread/2);
         for (int j = 0; j < 3; ++j)
-            transform.i_rotation[j] = ((float)rand() / RAND_MAX)*Math::PI*2;
+            transform.i_rotation[j] = ((float)rand() / (float)RAND_MAX)*Math::PI*2;
         if (rand()%100 != 0)
             transform.i_pos.z += spread/2;
         testEntity.add_comp(transform, *ECSManager::main);
