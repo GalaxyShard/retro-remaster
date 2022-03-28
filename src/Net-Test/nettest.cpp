@@ -15,27 +15,27 @@
     GAME pch:       9.660
 //*/
 
-struct RigidbodyECS
-{
-    Vector3 position;
-    Vector3 velocity;
-    float drag = .5f;
-};
-struct AABBColliderECS
-{
-    Vector3 min, max;
-};
-class PhysicsSystem : public System<PhysicsSystem, RigidbodyECS, AABBColliderECS>
-{
-public:
-    void func(RigidbodyECS &rb, AABBColliderECS &aabb)
-    {
-        rb.velocity += Vector3(0,-9.81f,0) * Time::delta();
-        rb.position += rb.velocity * Time::delta();
-        rb.velocity *= 1 - (rb.drag * Time::delta());
-        logmsg("test %.3o\n", rb.velocity);
-    }
-};
+//struct RigidbodyECS
+//{
+//    Vector3 position;
+//    Vector3 velocity;
+//    float drag = .5f;
+//};
+//struct AABBColliderECS
+//{
+//    Vector3 min, max;
+//};
+//class PhysicsSystem : public System<PhysicsSystem, RigidbodyECS, AABBColliderECS>
+//{
+//public:
+//    void func(RigidbodyECS &rb, AABBColliderECS &aabb)
+//    {
+//        rb.velocity += Vector3(0,-9.81f,0) * Time::delta();
+//        rb.position += rb.velocity * Time::delta();
+//        rb.velocity *= 1 - (rb.drag * Time::delta());
+//        logmsg("test %.3o\n", rb.velocity);
+//    }
+//};
 
 // OpenAL
 //https://indiegamedev.net/2020/02/15/the-complete-guide-to-openal-with-c-part-1-playing-a-sound/

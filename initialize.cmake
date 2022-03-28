@@ -6,11 +6,11 @@ include(private.cmake OPTIONAL)
 
 set(GAME_SRC
     src/Minesweeper/minesweeper.cpp
-    src/Ping-4/ping4.cpp
-    src/Snake/snake.cpp
+    #src/Ping-4/ping4.cpp
+    #src/Snake/snake.cpp
     src/start.cpp
-    src/Net-Test/nettest.cpp
-    src/Net-Test/joystick.cpp
-    src/Net-Test/controller.cpp
+    #src/Net-Test/nettest.cpp
+    #src/Net-Test/joystick.cpp
+    #src/Net-Test/controller.cpp
     src/utils.cpp
 )
