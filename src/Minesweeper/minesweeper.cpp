@@ -5,25 +5,31 @@ enum TileFlags : ucharG { ISBOMB = 1<<0, ISREVEALED = 1<<1, ISFLAGGED = 1<<2 };
 struct Tile
 {
     ucharG flags = 0;
+    ucharG bombCount = 0;
+    UIImage *img = 0;
 };
 struct Minesweeper
 {
     unsigned int mapWidth = 16, mapHeight = 16;
     unsigned int bombs = 40;
     unsigned int tiles = mapWidth * mapHeight;
-    bool gameStarted = 0;
+    bool gameStarted = 0, gameEnded = 0, gameWon = 0;
     
     double startTime;
     double elapsed = 0;
-    int flagCount = 0;
+    unsigned int flagCount = 0;
+    uintG revealCount = 0;
     Tile *map = 0;
 
     Listener renderConn;
     UIText *timer, *flagsText;
+
+    UIText *endText = 0;
+    UIImage *endBg = 0;
 #if OS_MOBILE || OS_WEB
     UIImage *flagButton;
 #endif
-    std::map<UIImage*, int> imgToTile;
+    std::map<UIImage*, unsigned int> imgToTile;
     AssetRef<Texture> tileTex, flagTex, bombTex, restartTex, continueTex, menuTex;
 
     Minesweeper();
@@ -33,6 +39,8 @@ struct Minesweeper
     void continue_game();
     void start_game();
     void clear_board();
+    Tile* find(int x, int y);
+    void reveal_tile(int x, int y);
     void on_click();
     void pre_render();
 };
@@ -53,18 +61,55 @@ void Minesweeper::pre_render()
 {
     timer->str = hms(Time::get()-startTime+elapsed);
     timer->refresh();
-    //logmsg("str %o\n", timer->str);
 }
 void Minesweeper::end_game(bool won)
 {
+    if (gameEnded) return;
+    gameEnded = 1;
+    gameWon = won;
     elapsed = Time::get()-startTime + elapsed;
     renderConn.disconnect();
+
+    if (won)
+    {
+        for (uintG i = 0; i < tiles; ++i)
+        {
+            //if ((map[i].flags & ISBOMB) && !(map[i].flags & ISFLAGGED))
+            if (map[i].flags == ISBOMB)
+            {
+                map[i].flags |= ISFLAGGED;
+                map[i].img->texture = flagTex.get();
+                ++flagCount;
+            }
+        }
+        flagsText->str = std::to_string(flagCount);
+        flagsText->refresh();
+    }
+
+    endBg = UIImage::create();
+    constexpr float grey = 0.2f;
+    endBg->tint = Vector4(grey,grey,grey,0.5f);
+    endBg->render_order(1);
+    endBg->scale = Vector2(1, 0.25f);
+    endBg->anchor = Vector2(0,0);
+    endText = text_for_img(won ? "You Win!" : "Game Over", endBg);
+}
+Tile* Minesweeper::find(int x, int y)
+{
+    if (!Math::within<int>(x, 0, mapWidth-1) || !Math::within<int>(y, 0, mapHeight-1))
+        return 0;
+    return &map[x+y*mapWidth];
 }
 void Minesweeper::continue_game()
 {
+    if (!gameEnded) return;
+    gameEnded = 0;
+    UIImage::destroy(endBg), endBg = 0;
+    UIText::destroy(endText), endText = 0;
+
+    if (gameWon) return;
     startTime = Time::get();
     renderConn = Renderer::pre_render().connect(CLASS_LAMBDA(pre_render));
-    
 }
 void Minesweeper::start_game()
 {
@@ -79,10 +124,60 @@ void Minesweeper::start_game()
         map[bomb].flags |= ISBOMB;
     }
 }
+void Minesweeper::reveal_tile(int x, int y)
+{
+    Tile *tile = find(x,y);
+    if (!tile || (tile->flags & (ISREVEALED | ISFLAGGED)))
+        return;
+
+    tile->flags |= ISREVEALED;
+    if (tile->flags & ISBOMB)
+    {
+        tile->img->texture = bombTex.get();
+        end_game(0);
+        return;
+    }
+    ++revealCount;
+    if (revealCount == tiles-bombs)
+        end_game(1);
+    
+    ucharG bombCount = 0;
+
+    auto isBomb = [&](int xoff, int yoff)->bool
+    {
+        Tile *newTile = find(x+xoff, y+yoff);
+        return newTile && newTile->flags & ISBOMB;
+    };
+    bombCount += isBomb(-1, -1);
+    bombCount += isBomb(-1,  0);
+    bombCount += isBomb(-1,  1);
+    bombCount += isBomb( 1, -1);
+    bombCount += isBomb( 1,  0);
+    bombCount += isBomb( 1,  1);
+    bombCount += isBomb( 0,  1);
+    bombCount += isBomb( 0, -1);
+
+    if (!bombCount)
+    {
+        reveal_tile(x-1, y-1);
+        reveal_tile(x-1, y  );
+        reveal_tile(x-1, y+1);
+        reveal_tile(x+1, y-1);
+        reveal_tile(x+1, y  );
+        reveal_tile(x+1, y+1);
+        reveal_tile(x,   y-1);
+        reveal_tile(x,   y+1);
+    }
+    tile->bombCount = bombCount;
+    UIText *text = text_for_img(std::to_string(bombCount), tile->img);
+    text->scale *= 1.25f;
+}
 void Minesweeper::on_click()
 {
+    if (gameEnded)
+        return;
     UIImage *img = UIImage::get_held();
-    int index = imgToTile[img];
+    unsigned int index = imgToTile[img];
     Tile *tile = map+index;
     if (!gameStarted)
     {
@@ -96,8 +191,39 @@ void Minesweeper::on_click()
             tile->flags &= ~ISBOMB;
         }
     }
+    uintG x = index % mapWidth;
+    uintG y = index / mapWidth;
     if (tile->flags & ISREVEALED)
+    {
+        if ((tile->flags & ISBOMB) || !tile->bombCount)
+            return;
+        auto isFlagged = [&](int xoff, int yoff)->bool
+        {
+            Tile *newTile = find(x+xoff, y+yoff);
+            return newTile && newTile->flags & ISFLAGGED;
+        };
+        uintG flagCount = 0;
+        flagCount += isFlagged(-1, -1);
+        flagCount += isFlagged(-1,  0);
+        flagCount += isFlagged(-1,  1);
+        flagCount += isFlagged( 1, -1);
+        flagCount += isFlagged( 1,  0);
+        flagCount += isFlagged( 1,  1);
+        flagCount += isFlagged( 0,  1);
+        flagCount += isFlagged( 0, -1);
+        if (flagCount == tile->bombCount)
+        {
+            reveal_tile(x-1, y-1);
+            reveal_tile(x-1, y  );
+            reveal_tile(x-1, y+1);
+            reveal_tile(x+1, y-1);
+            reveal_tile(x+1, y  );
+            reveal_tile(x+1, y+1);
+            reveal_tile(x,   y-1);
+            reveal_tile(x,   y+1);
+        }
         return;
+    }
 
     if (Input::is_held("place_flag"))
     {
@@ -117,7 +243,7 @@ void Minesweeper::on_click()
     }
     else
     {
-        tile->flags |= ISREVEALED;
+        reveal_tile(x,y);
     }
 }
 Minesweeper::Minesweeper()
@@ -129,11 +255,11 @@ Minesweeper::Minesweeper()
     continueTex = Texture::load(Assets::path()+"/textures/continue.png", Texture::Pixel);
     menuTex = Texture::load(Assets::path()+"/textures/menuButton.png", Texture::Pixel);
 
-    UIImage *nav = UIImage::create();
-    nav->tint = Vector4(0.1, 0.1, 0.1, 1);
-    nav->group = UIGroup::safeArea;
-    nav->pos = Vector2(0, 1);
-    nav->scale = Vector2(2, 0.5f);
+    //UIImage *nav = UIImage::create();
+    //nav->tint = Vector4(0.1, 0.1, 0.1, 1);
+    //nav->group = UIGroup::safeArea;
+    //nav->pos = Vector2(0, 1);
+    //nav->scale = Vector2(2, 0.5f);
 
     timer = UIText::create("00:00");
     timer->anchor = Vector2(1, 1);
@@ -214,7 +340,7 @@ Minesweeper::Minesweeper()
     {
         Vector2Int tile = Vector2Int(i % mapWidth, i / mapWidth);
         UIImage *img = UIImage::create(tileTex.get());
-        //map[i].img = img;
+        map[i].img = img;
         img->group = UIGroup::aspectRatio;
 
         img->scale = imgSize;
