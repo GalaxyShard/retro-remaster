@@ -13,4 +13,5 @@ set(GAME_SRC
     #src/Net-Test/joystick.cpp
     #src/Net-Test/controller.cpp
     src/utils.cpp
+    src/GeometryDash/menu.cpp
 )

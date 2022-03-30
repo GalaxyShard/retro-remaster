@@ -1,10 +1,15 @@
-#include <Galaxy/engine.hpp>
 #include <utils.hpp>
 
 const char *gameName = "Retro Collection";
 
 //static Scene *scene;
 //static std::string sceneToOpen;
+
+// for gitpod:
+// source /workspace/emsdk/emsdk_env.sh
+// emrun bin/web/Retro\ Collection.html
+// emcmake cmake -B bin/web -DPLATFORM=web -DENGINE_ROOT=/workspace/Galaxy-Engine -DRELEASE_BUILD=1
+// emmake make -C bin/web -j8
 
 struct StartScene
 {
@@ -115,12 +120,22 @@ StartScene::StartScene()
         );
     };
 
+    UIImage *dashBtn = UIImage::create();
+    dashBtn->tint = buttonColor;
+    dashBtn->anchor = Vector2(-1,-1);
+    dashBtn->scale = gameSize;
+    dashBtn->pos = Vector2(0.1+dashBtn->scale.x/2, 0.15+dashBtn->scale.y/2+dashBtn->scale.y);
+    UIText *dashText = text_for_img("Dash", dashBtn);
+    dashText->scale.y *= 0.5f;
+    dashBtn->onClick = [this](){
+        init_menu("Dash", "Dash", "");
+    };
 
     UIImage *testBtn = UIImage::create();
     testBtn->tint = buttonColor;
-    testBtn->anchor = Vector2(-1,-1);
+    testBtn->anchor = Vector2(0,-1);
     testBtn->scale = gameSize;
-    testBtn->pos = Vector2(0.1+testBtn->scale.x/2, 0.15+testBtn->scale.y/2+testBtn->scale.y);
+    testBtn->pos = Vector2(0, 0.15+testBtn->scale.y/2+testBtn->scale.y);
     UIText *testText = text_for_img("Test", testBtn);
     testText->scale.y *= 0.5f;
     testBtn->onClick = [this](){
