@@ -1,4 +1,4 @@
-
+#include <utils.hpp>
 struct DashMenu
 {
     AssetRef<Texture> menuTex;
@@ -21,6 +21,7 @@ DashMenu::DashMenu()
     };
 
     UIImage *startBtn = UIImage::create();
+    startBtn->tint = Vector4(0.2,0.2,0.2,1);
     startBtn->anchor = Vector2(0,0);
     startBtn->scale = Vector2(1, 0.25);
     startBtn->onClick = []()

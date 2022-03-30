@@ -14,4 +14,5 @@ set(GAME_SRC
     #src/Net-Test/controller.cpp
     src/utils.cpp
     src/GeometryDash/menu.cpp
+    src/GeometryDash/level0.cpp
 )

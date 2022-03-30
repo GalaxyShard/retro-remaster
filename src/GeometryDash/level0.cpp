@@ -1,13 +1,16 @@
-
+#include <utils.hpp>
 struct DashLevel0
 {
+    Listener renderConn;
+    ListenerT<TouchData> inputConn;
     AssetRef<Texture> menuTex;
     AssetRef<Shader> colShader, tintShader;
     AssetRef<Mesh> square;
-    bool jump=0;
 
     std::unique_ptr<Material> playerMat;
     Object *player;
+
+    bool jump=0;
 
     void pre_render();
     void handle_touch(TouchData data);
@@ -27,9 +30,9 @@ DashLevel0::DashLevel0()
     menuTex = Texture::load(Assets::path()+"/textures/menuButton.png", Texture::Pixel);
 
     renderConn = Renderer::pre_render().connect(CLASS_LAMBDA(pre_render));
-    inputConn = Input::touch_changed().connect(CLASS_LAMBDA(handle_touch));
+    inputConn = Input::touch_changed().connect(TYPE_LAMBDA(handle_touch, TouchData));
 
-    square = Mesh::from_obj(Assets::gpath()+"/models/square.obj");
+    square = Mesh::load_obj(Assets::gpath()+"/models/square.obj");
     colShader = Shader::load(Assets::gpath()+SHADER_FOLDER+"/color.shader");
     tintShader = Shader::load(Assets::gpath()+SHADER_FOLDER+"/tint.shader");
 
@@ -53,4 +56,4 @@ DashLevel0::~DashLevel0()
 {
     Input::remove_bind("jump");
 }
-ADD_SCENE_COMPONENT("Dash", DashLevel0);
+ADD_SCENE_COMPONENT("Dash-Level0", DashLevel0);
