@@ -353,6 +353,8 @@ Minesweeper::Minesweeper()
 }
 Minesweeper::~Minesweeper()
 {
+    if (Input::is_held("place_flag"))
+        Input::trigger("place_flag", 0);
     Input::remove_bind("place_flag");
     delete[] map;
 }
