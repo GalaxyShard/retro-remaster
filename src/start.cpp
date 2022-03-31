@@ -2,13 +2,9 @@
 
 const char *gameName = "Retro Collection";
 
-//static Scene *scene;
-//static std::string sceneToOpen;
-
 // for gitpod:
 // source /workspace/emsdk/emsdk_env.sh
-// emrun bin/web/Retro\ Collection.html
-// emcmake cmake -B bin/web -DPLATFORM=web -DENGINE_ROOT=/workspace/Galaxy-Engine -DRELEASE_BUILD=1
+// emcmake cmake -B bin/web -DENGINE_ROOT=/workspace/Galaxy-Engine -DRELEASE=1
 // emmake make -C bin/web -j8
 
 struct StartScene
