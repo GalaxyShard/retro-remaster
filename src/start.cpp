@@ -143,10 +143,44 @@ StartScene::~StartScene()
 {
     Renderer::set_clear_color(0,0,0,1);
 }
+struct FPSCounter
+{
+    Listener renderConn;
+    std::deque<float> lastMS;
+    UIText *fpsText;
+    void pre_render();
+    FPSCounter();
+};
+void FPSCounter::pre_render()
+{
+    lastMS.push_back(Time::frame_time());
+    float ms = 0;
+    for (float last : lastMS)
+        ms += last;
+    ms /= lastMS.size();
+    unsigned int fps = (unsigned int)(1.f/ms);
+
+    while (lastMS.size() > std::min(fps, 60u)/2u)
+        lastMS.pop_front();
+    fpsText->str = "MS: " + std::to_string((int)(ms*1000)) + ", FPS: " + std::to_string(fps);
+    fpsText->refresh();
+}
+FPSCounter::FPSCounter()
+{
+    renderConn = Renderer::pre_render().connect(CLASS_LAMBDA(pre_render));
+    fpsText = UIText::create("MS: 00");
+    fpsText->group = UIGroup::aspectRatio;
+    fpsText->anchor = Vector2(1, 1);
+    fpsText->pos = Vector2(-0.25, -0.25);
+    fpsText->scale = Vector2(0.5, 0.25);
+    fpsText->render_order(1000);
+}
 static void init()
 {
     Font::defaultFont = new Font(Assets::gpath()+"/VT323");
+    Scene::create("Global");
     Scene::create("Start");
 }
 INIT_FUNC(init);
 ADD_SCENE_COMPONENT("Start", StartScene);
+ADD_SCENE_COMPONENT("Global", FPSCounter);
