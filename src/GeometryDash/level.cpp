@@ -2,11 +2,14 @@
 struct DashCollider
 {
     Object *obj;
+    Vector2 points[4];
+    // float xMin, xMax;
     enum {AABB,TRIANGLE} type;
     bool killOnTouch;
     DashCollider(Object *obj, decltype(type) type, bool killOnTouch)
-        : obj(obj), type(type), killOnTouch(killOnTouch) { }
+        : obj(obj), type(type), killOnTouch(killOnTouch) { generate(); }
 
+    void generate();
 };
 static const Vector2 triangleNorm0 = (Vector2(0, 0.5) - Vector2(-0.5, -0.5)).unit().perpendicular();
 static const Vector2 triangleNorm1 = (Vector2(0, 0.5) - Vector2( 0.5, -0.5)).unit().perpendicular();
@@ -17,7 +20,7 @@ struct DashCollisionData
     DashCollisionData(Vector2 mtv) : mtv(mtv), collided(1) {}
     DashCollisionData() : mtv(), collided(0) {}
 };
-struct DashLevel0
+struct DashLevel
 {
     Listener renderConn;
     ListenerT<TouchData> inputConn;
@@ -42,10 +45,46 @@ struct DashLevel0
     void pre_render();
     void end_game(bool won);
     void handle_touch(TouchData data);
-    DashLevel0();
-    ~DashLevel0();
+    DashLevel();
+    ~DashLevel();
 };
-void DashLevel0::end_game(bool won)
+bool test_aabb_1D(float min0, float max0, float min1, float max1)
+{
+    // minDot[1]<maxDot[0] && minDot[0]<maxDot[1]
+    return min1<max0 && min0<max1;
+}
+void DashCollider::generate()
+{
+    Vector2 halfScale = obj->scale*0.5f;
+    // xMin = Math::INF;
+    // xMax = -Math::INF;
+    if (type == DashCollider::AABB)
+    {
+        points[0] = Vector2(-1, -1);
+        points[1] = Vector2( 1, -1);
+        points[2] = Vector2(-1,  1);
+        points[3] = Vector2( 1,  1);
+        for (uintg i = 0; i < 4; ++i)
+        {
+            points[i] = obj->position + (halfScale*points[i]);
+            // xMin = std::min(xMin, points[i].x);
+            // xMax = std::min(xMax, points[i].x);
+        }
+    }
+    else if (type == DashCollider::TRIANGLE)
+    {
+        points[0] = Vector2(-1, -1);
+        points[1] = Vector2( 1, -1);
+        points[2] = Vector2( 0,  1);
+        for (uintg i = 0; i < 3; ++i)
+            points[i] = obj->position + (halfScale*points[i]);
+    }
+    else
+    {
+        logerr("Collider not recognized: %d\n", type);
+    }
+}
+void DashLevel::end_game(bool won)
 {
     if (gameEnded)
         return;
@@ -79,14 +118,12 @@ DashCollisionData test_collision(Vector2 *player, DashCollider *collider)
     Vector2 mtv;
     float mtvMag = Math::INF;
     float minDot[2], maxDot[2];
-
-    Vector2 points[4];
     uintg numPoints = 0;
     
     auto testAxis = [&](Vector2 axis) -> bool
     {
-        min_max_dot(player, 4,         axis, minDot[0], maxDot[0]);
-        min_max_dot(points, numPoints, axis, minDot[1], maxDot[1]);
+        min_max_dot(player,           4,         axis, minDot[0], maxDot[0]);
+        min_max_dot(collider->points, numPoints, axis, minDot[1], maxDot[1]);
 
             /*
                 tests
@@ -115,18 +152,10 @@ DashCollisionData test_collision(Vector2 *player, DashCollider *collider)
         }
         return 0;
     };
-    // Points should be cached in DashCollider
-    Vector2 halfScale = collider->obj->scale*0.5f;
     if (collider->type == DashCollider::AABB)
     {
         numPoints = 4;
-        points[0] = Vector2(-1, -1);
-        points[1] = Vector2( 1, -1);
-        points[2] = Vector2(-1,  1);
-        points[3] = Vector2( 1,  1);
-        for (uintg i = 0; i < 4; ++i)
-            points[i] = collider->obj->position + (halfScale*points[i]);
-        
+
         if (!testAxis(Vector2(1, 0)) || !testAxis(Vector2(0, 1))
             || !testAxis(player[4]) || !testAxis(player[5]))
             return DashCollisionData();
@@ -136,11 +165,6 @@ DashCollisionData test_collision(Vector2 *player, DashCollider *collider)
     else if (collider->type == DashCollider::TRIANGLE)
     {
         numPoints = 3;
-        points[0] = Vector2(-1, -1);
-        points[1] = Vector2( 1, -1);
-        points[2] = Vector2( 0,  1);
-        for (uintg i = 0; i < 3; ++i)
-            points[i] = collider->obj->position + (halfScale*points[i]);
 
         if (!testAxis(player[4]) || !testAxis(player[5])
             || !testAxis(Vector2(0,1)) || !testAxis(triangleNorm0) || !testAxis(triangleNorm1))
@@ -151,11 +175,11 @@ DashCollisionData test_collision(Vector2 *player, DashCollider *collider)
     return DashCollisionData();
 }
 
-void DashLevel0::handle_touch(TouchData data)
+void DashLevel::handle_touch(TouchData data)
 {
     jump = data.state != TouchState::RELEASED;
 }
-void DashLevel0::pre_render()
+void DashLevel::pre_render()
 {
 
     vel.y += gravity * Time::delta();
@@ -168,8 +192,9 @@ void DashLevel0::pre_render()
     player->position.y += vel.y * Time::delta();
 
     Vector2 playerPoints[6];
+    // Vector2 playerBounds;
     {
-        //Matrix2x2 rot = Matrix2x2::rotate(player->rotation.z);
+        // Matrix2x2 rot = Matrix2x2::rotate(player->rotation.z);
         Matrix2x2 rot = Matrix2x2::identity();
         Vector2 corner = player->scale*0.5f;
         playerPoints[0] = Vector2(-1, -1);
@@ -181,13 +206,24 @@ void DashLevel0::pre_render()
         
         playerPoints[4] = rot * Vector2(1,0);
         playerPoints[5] = rot * Vector2(0,1);
+        // playerBounds = Vector2(player->position.x - corner.x*1.5f, player->position.x + corner.x*1.5f);
     }
     Vector2 tempPlayer[6];
     tempPlayer[4] = playerPoints[4];
     tempPlayer[5] = playerPoints[5];
     bool didCollide = 0;
+
+    float camPosX = Camera::main->position.x;
+    float camScaleX = Camera::main->orthoSize*Renderer::aspectRatio.x;
+    float camMin = camPosX-camScaleX;
+    float camMax = camPosX+camScaleX;
     for (auto &collider : colliders)
     {
+        float objPos = collider.obj->position.x;
+        float halfObj = collider.obj->scale.x*0.5f;
+        collider.obj->enabled = test_aabb_1D(objPos-halfObj, objPos+halfObj, camMin, camMax);
+        if (!collider.obj->enabled) continue;
+
         for (uintg i = 0; i < 4; ++i)
             tempPlayer[i] = player->position + playerPoints[i];
         
@@ -212,7 +248,7 @@ void DashLevel0::pre_render()
     }
     Camera::main->position.x = player->position.x + 7.5f;
 }
-DashLevel0::DashLevel0()
+DashLevel::DashLevel()
 {
     Renderer::set_clear_color(0.2,0.2,0.3,1);
     Camera::main->orthoSize = 10;
@@ -249,13 +285,6 @@ DashLevel0::DashLevel0()
     player->position = Vector2(0, -0.75);
     player->position.z = 1;
 
-    //fakePlayerMat = std::make_unique<Material>(colShader.get());
-    //fakePlayerMat->set_uniform("u_color", Vector4(1,1,1,0.5));
-    //fakePlayer = Object::create(square.get(), fakePlayerMat.get());
-    //fakePlayer->scale = Vector2(1, 1);
-    //fakePlayer->position = Vector2(0, -0.75);
-    //fakePlayer->position.z = 0.5;
-
     otherMat = std::make_unique<Material>(colShader.get());
     otherMat->set_uniform("u_color", Vector4(0.3,0.3,0.5,1));
     Object *other = Object::create(square.get(), otherMat.get());
@@ -280,23 +309,13 @@ DashLevel0::DashLevel0()
     }
 
     colliders.push_back(DashCollider(other, DashCollider::AABB, 0));
-    //for (uintG i = 0; i < 1000; ++i)
-    //{
-    //    Object *other = Object::create(square.get(), otherMat.get());
-    //    other->scale = Vector2(0.1, 0.1);
-    //    other->position = Vector2(rand()/(float)RAND_MAX*10000, rand()/(float)RAND_MAX * 11 - 1);
-    //}
-    
-
-    //Math::insertion_sort<DashCollider>(colliders, [](DashCollider &a, DashCollider &b)->bool
-    //{ return a.obj->position.x < b.obj->position.x; });
 
     Input::add_bind("jump", Key::Space, [this](bool p){jump=p;});
 }
-DashLevel0::~DashLevel0()
+DashLevel::~DashLevel()
 {
     Renderer::set_clear_color(0,0,0,1);
     Input::remove_bind("jump");
     Camera::main->reset();
 }
-ADD_SCENE_COMPONENT("Dash-Level0", DashLevel0);
+ADD_SCENE_COMPONENT("Dash-Level0", DashLevel);
