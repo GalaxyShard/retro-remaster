@@ -162,17 +162,18 @@ void FPSCounter::pre_render()
 
     while (lastMS.size() > std::min(fps, 60u)/2u)
         lastMS.pop_front();
-    fpsText->str = "MS: " + std::to_string((int)(ms*1000)) + ", FPS: " + std::to_string(fps);
+    fpsText->str = "MS: " + std::to_string((int)(ms*1000));
     fpsText->refresh();
 }
 FPSCounter::FPSCounter()
 {
     renderConn = Renderer::pre_render().connect(CLASS_LAMBDA(pre_render));
-    fpsText = UIText::create("MS: 00");
+    fpsText = UIText::create("MS: 0");
     fpsText->group = UIGroup::aspectRatio;
-    fpsText->anchor = Vector2(1, 1);
-    fpsText->pos = Vector2(-0.25, -0.25);
-    fpsText->scale = Vector2(0.5, 0.25);
+    fpsText->anchor = Vector2(0, -1);
+    fpsText->pos = Vector2(0, 0.05);
+    fpsText->pivot = Vector2(0,0);
+    fpsText->scale = Vector2(0.5, 0.1);
     fpsText->render_order(1000);
 }
 static void init()
