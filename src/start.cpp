@@ -160,7 +160,7 @@ void FPSCounter::pre_render()
     ms /= lastMS.size();
     unsigned int fps = (unsigned int)(1.f/ms);
 
-    while (lastMS.size() > std::min(fps, 60u)/2u)
+    while (lastMS.size() > std::min(fps, 20u)/2u)
         lastMS.pop_front();
     char buffer[10];
     snprintf(buffer, 10, "MS: %.2f", ms*1000);
@@ -171,7 +171,7 @@ FPSCounter::FPSCounter()
 {
     renderConn = Renderer::pre_render().connect(CLASS_LAMBDA(pre_render));
     fpsText = UIText::create("MS: 0.0");
-    fpsText->group = UIGroup::aspectRatio;
+    fpsText->group = UIGroup::safeArea;
     fpsText->anchor = Vector2(0, 1);
     fpsText->pos = Vector2(0, -0.0325);
     fpsText->pivot = Vector2(0,0);
