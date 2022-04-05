@@ -18,7 +18,7 @@ struct Minesweeper
     double startTime;
     double elapsed = 0;
     unsigned int flagCount = 0;
-    uintG revealCount = 0;
+    uintg revealCount = 0;
     Tile *map = 0;
 
     Listener renderConn;
@@ -72,7 +72,7 @@ void Minesweeper::end_game(bool won)
 
     if (won)
     {
-        for (uintG i = 0; i < tiles; ++i)
+        for (uintg i = 0; i < tiles; ++i)
         {
             //if ((map[i].flags & ISBOMB) && !(map[i].flags & ISFLAGGED))
             if (map[i].flags == ISBOMB)
@@ -191,8 +191,8 @@ void Minesweeper::on_click()
             tile->flags &= ~ISBOMB;
         }
     }
-    uintG x = index % mapWidth;
-    uintG y = index / mapWidth;
+    uintg x = index % mapWidth;
+    uintg y = index / mapWidth;
     if (tile->flags & ISREVEALED)
     {
         if ((tile->flags & ISBOMB) || !tile->bombCount)
@@ -202,7 +202,7 @@ void Minesweeper::on_click()
             Tile *newTile = find(x+xoff, y+yoff);
             return newTile && newTile->flags & ISFLAGGED;
         };
-        uintG flagCount = 0;
+        uintg flagCount = 0;
         flagCount += isFlagged(-1, -1);
         flagCount += isFlagged(-1,  0);
         flagCount += isFlagged(-1,  1);

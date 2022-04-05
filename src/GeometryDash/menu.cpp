@@ -27,7 +27,7 @@ DashMenu::DashMenu()
     startBtn->onClick = []()
     {
         Scene::destroy(Scene::activeScene);
-        Scene::create("Dash-Level0");
+        Scene::create("DashLevel");
     };
     UIText *text = text_for_img("Start!", startBtn);
 }

@@ -1,12 +1,11 @@
 #include <utils.hpp>
 struct DashCollider
 {
-    Object *obj;
+    Object2D *obj;
     Vector2 points[4];
-    // float xMin, xMax;
     enum {AABB,TRIANGLE} type;
     bool killOnTouch;
-    DashCollider(Object *obj, decltype(type) type, bool killOnTouch)
+    DashCollider(Object2D *obj, decltype(type) type, bool killOnTouch)
         : obj(obj), type(type), killOnTouch(killOnTouch) { generate(); }
 
     void generate();
@@ -32,7 +31,7 @@ struct DashLevel
     std::unique_ptr<Material> playerMat, otherMat, spikeMat;
 
     std::vector<DashCollider> colliders;
-    Object *player;
+    Object2D *player;
 
 
     float gravity = -25.9f*2;
@@ -40,7 +39,7 @@ struct DashLevel
     float jumpHeight = 2;
     Vector3 vel;
 
-    bool jump=0, gameEnded=0;
+    bool jump=0, gameEnded=0, isGrounded=1;
 
     void pre_render();
     void end_game(bool won);
@@ -48,16 +47,13 @@ struct DashLevel
     DashLevel();
     ~DashLevel();
 };
-bool test_aabb_1D(float min0, float max0, float min1, float max1)
+static bool test_aabb_1D(float min0, float max0, float min1, float max1)
 {
-    // minDot[1]<maxDot[0] && minDot[0]<maxDot[1]
     return min1<max0 && min0<max1;
 }
 void DashCollider::generate()
 {
     Vector2 halfScale = obj->scale*0.5f;
-    // xMin = Math::INF;
-    // xMax = -Math::INF;
     if (type == DashCollider::AABB)
     {
         points[0] = Vector2(-1, -1);
@@ -65,11 +61,8 @@ void DashCollider::generate()
         points[2] = Vector2(-1,  1);
         points[3] = Vector2( 1,  1);
         for (uintg i = 0; i < 4; ++i)
-        {
             points[i] = obj->position + (halfScale*points[i]);
-            // xMin = std::min(xMin, points[i].x);
-            // xMax = std::min(xMax, points[i].x);
-        }
+        
     }
     else if (type == DashCollider::TRIANGLE)
     {
@@ -98,8 +91,10 @@ void DashLevel::end_game(bool won)
     endBg->scale = Vector2(1, 0.25f);
     endBg->anchor = Vector2(0,0);
     UIText *endText = text_for_img(won ? "You Win!" : "Game Over", endBg);
+
+    Object2D::destroy(player);
 }
-void min_max_dot(Vector2 *points, uintg len, Vector2 axis, float &min, float &max)
+static void min_max_dot(Vector2 *points, uintg len, Vector2 axis, float &min, float &max)
 {
     min = Vector2::dot(points[0], axis);
     max = min;
@@ -113,7 +108,7 @@ void min_max_dot(Vector2 *points, uintg len, Vector2 axis, float &min, float &ma
             max = product;
     }
 }
-DashCollisionData test_collision(Vector2 *player, DashCollider *collider)
+static DashCollisionData test_collision(Vector2 *player, DashCollider *collider)
 {
     Vector2 mtv;
     float mtvMag = Math::INF;
@@ -174,7 +169,15 @@ DashCollisionData test_collision(Vector2 *player, DashCollider *collider)
     }
     return DashCollisionData();
 }
+float move_towards(float current, float goal, float speed)
+{
+    float to = goal - current;
+    if (to <= speed) return goal;
 
+    return current + speed;
+    //float inverseDist = 1.f / to;
+    //return current + to * inverseDist * speed;
+}
 void DashLevel::handle_touch(TouchData data)
 {
     jump = data.state != TouchState::RELEASED;
@@ -183,19 +186,16 @@ void DashLevel::pre_render()
 {
 
     vel.y += gravity * Time::delta();
-    if (jump)
+    if (jump && isGrounded)
     {
-        jump = 0;
         vel.y = sqrt(jumpHeight*2*-gravity);
     }
     player->position.x += speed * Time::delta();
     player->position.y += vel.y * Time::delta();
 
     Vector2 playerPoints[6];
-    // Vector2 playerBounds;
     {
-        // Matrix2x2 rot = Matrix2x2::rotate(player->rotation.z);
-        Matrix2x2 rot = Matrix2x2::identity();
+        Matrix2x2 rot = Matrix2x2::rotate(player->rotation);
         Vector2 corner = player->scale*0.5f;
         playerPoints[0] = Vector2(-1, -1);
         playerPoints[1] = Vector2( 1, -1);
@@ -203,35 +203,39 @@ void DashLevel::pre_render()
         playerPoints[3] = Vector2( 1,  1);
         for (uintg i = 0; i < 4; ++i)
             playerPoints[i] = rot*(corner*playerPoints[i]);
-        
+
         playerPoints[4] = rot * Vector2(1,0);
         playerPoints[5] = rot * Vector2(0,1);
-        // playerBounds = Vector2(player->position.x - corner.x*1.5f, player->position.x + corner.x*1.5f);
     }
     Vector2 tempPlayer[6];
     tempPlayer[4] = playerPoints[4];
     tempPlayer[5] = playerPoints[5];
     bool didCollide = 0;
 
-    float camPosX = Camera::main->position.x;
-    float camScaleX = Camera::main->orthoSize*Renderer::aspectRatio.x;
-    float camMin = camPosX-camScaleX;
-    float camMax = camPosX+camScaleX;
+    //float camPosX = Camera::main->position.x;
+    //float camScaleX = Camera::main->orthoSize*Renderer::aspectRatio.x;
+    //float camMin = camPosX-camScaleX;
+    //float camMax = camPosX+camScaleX;
     for (auto &collider : colliders)
     {
-        float objPos = collider.obj->position.x;
-        float halfObj = collider.obj->scale.x*0.5f;
-        collider.obj->enabled = test_aabb_1D(objPos-halfObj, objPos+halfObj, camMin, camMax);
-        if (!collider.obj->enabled) continue;
+        //float objPos = collider.obj->position.x;
+        //float halfObj = collider.obj->scale.x*0.5f;
+        //collider.obj->enabled = test_aabb_1D(objPos-halfObj, objPos+halfObj, camMin, camMax);
+        //if (!collider.obj->enabled) continue;
 
         for (uintg i = 0; i < 4; ++i)
             tempPlayer[i] = player->position + playerPoints[i];
         
         DashCollisionData data = test_collision(tempPlayer, &collider);
         player->position += data.mtv;
-        didCollide |= data.collided;
 
-        if ((collider.killOnTouch && data.collided) || data.mtv.x < -0.0001)
+        for (uintg i = 0; i < 4; ++i)
+            tempPlayer[i].y -= 0.05f;
+        DashCollisionData groundData = test_collision(tempPlayer, &collider);
+        
+        if (!collider.killOnTouch) didCollide |= groundData.collided;
+
+        if ((collider.killOnTouch && data.collided) || data.mtv.x < -0.1)
         {
             end_game(0);
             return;
@@ -240,12 +244,16 @@ void DashLevel::pre_render()
     if (didCollide)
     {
         vel.y = -0.1;
-        player->rotation.z = 0;
+        float increment = Math::PI*0.5f;
+        player->rotation = -move_towards(-player->rotation, roundf(-player->rotation/increment)*increment, 10*Time::delta());
+        isGrounded = 1;
     }
     else 
     {
-        player->rotation.z -= Math::PI*1.9f*Time::delta();
+        player->rotation -= Math::PI*1.75f*Time::delta();
+        isGrounded = 0;
     }
+    player->dirtyBounds();
     Camera::main->position.x = player->position.x + 7.5f;
 }
 DashLevel::DashLevel()
@@ -280,31 +288,34 @@ DashLevel::DashLevel()
 
     playerMat = std::make_unique<Material>(colShader.get());
     playerMat->set_uniform("u_color", Vector4(1,1,1,1));
-    player = Object::create(square.get(), playerMat.get());
+    player = Object2D::create(square.get(), playerMat.get());
     player->scale = Vector2(1, 1);
     player->position = Vector2(0, -0.75);
-    player->position.z = 1;
+    player->zIndex(1);
+    //player->zIndex;
+    //player->position.z = 1;
 
     otherMat = std::make_unique<Material>(colShader.get());
     otherMat->set_uniform("u_color", Vector4(0.3,0.3,0.5,1));
-    Object *other = Object::create(square.get(), otherMat.get());
+    Object2D *other = Object2D::create(square.get(), otherMat.get());
     other->scale = Vector2(10000, 100);
     other->position = Vector2(0, -1 - other->scale.y/2);
 
     spikeMat = std::make_unique<Material>(colShader.get());
     spikeMat->set_uniform("u_color", Vector4(0.75,0.75,0.75,1));
-    for (uintg i = 1; i <= 500; ++i)
+    for (uintg i = 1; i <= 2000; ++i)
     {
-        Object *test = Object::create(square.get(), spikeMat.get());
+        Object2D *test = Object2D::create(square.get(), spikeMat.get());
         test->scale = Vector2(0.35,1);
         test->position = Vector2(i*14.25, -1.75);
 
         uintg numSpikes = rand()%3+1;
         for (uintg j = 0; j < numSpikes; ++j)
         {
-            Object *spike = Object::create(triangle.get(), spikeMat.get());
+            bool isSpike = (rand()%2==0);
+            Object2D *spike = Object2D::create(isSpike ? triangle.get() : square.get(), spikeMat.get());
             spike->position = Vector2(i*14.25+2+j,-0.5);
-            colliders.push_back(DashCollider(spike, DashCollider::TRIANGLE, 1));
+            colliders.push_back(DashCollider(spike, isSpike ? DashCollider::TRIANGLE : DashCollider::AABB, isSpike));
         }
     }
 
@@ -318,4 +329,4 @@ DashLevel::~DashLevel()
     Input::remove_bind("jump");
     Camera::main->reset();
 }
-ADD_SCENE_COMPONENT("Dash-Level0", DashLevel);
+ADD_SCENE_COMPONENT("DashLevel", DashLevel);
