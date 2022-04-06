@@ -186,6 +186,35 @@ static void init()
     Font::defaultFont = new Font(Assets::gpath()+"/VT323");
     Scene::create("Global");
     Scene::create("Start");
+
+    // persistant IO on WebGL works but only after FS.syncfs finishes
+    // this code introduces a race condition
+//    {
+//        logmsg("Reading file...\n");
+//        std::ifstream input = std::ifstream(Assets::data_path()+"/testFile.txt");
+//        if (!input)
+//            goto END_READ;
+
+//        char buffer[5];
+//        logmsg("reading to buffer...\n");
+//        if (!input.read(buffer, 4))
+//            goto END_READ;
+//        buffer[4] = '\0';
+//        logmsg("buffer:\'%o\'\n", (char*)buffer);
+//    }
+//END_READ:
+//    std::ofstream output = std::ofstream(Assets::data_path()+"/testFile.txt");
+//    logmsg("writing to file...\n");
+//    if (!output)
+//        return;
+//    logmsg("writing number...\n");
+//    int random = rand()%9000+1000;
+//    output << random;
+//    if (!output)
+//        return;
+//    logmsg("wrote \'%o\' to file\n", random);
+//    Assets::sync_files();
+
 }
 INIT_FUNC(init);
 ADD_SCENE_COMPONENT("Start", StartScene);
