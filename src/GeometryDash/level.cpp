@@ -1,4 +1,5 @@
 #include <utils.hpp>
+#include <global.hpp>
 struct DashCollider
 {
     Object2D *obj;
@@ -300,7 +301,58 @@ DashLevel::DashLevel()
     // z-index -> float
 
     std::ifstream stream = std::ifstream(Assets::data_path()+"/level0", std::ios::binary);
-    // todo: loop over stream and deserialize objects
+    if (stream)
+    {
+        char buffer[64];
+        while (1)
+        {
+            // todo: redesign BinaryReader in a less OO style to use with this and audio loading
+            if (!stream.read(buffer, 1))
+                break;
+            ucharG header = *buffer;
+            if (header == Header::OBJ2D)
+            {
+                if (!stream.read(buffer, 1))
+                    assert(false);
+                ucharG meshType = *buffer;
+
+                if (!stream.read(buffer, 1))
+                    assert(false);
+                ucharG colliderType = *buffer;
+
+                if (!stream.read(buffer, 8))
+                    assert(false);
+                Vector2 scale = Vector2(to_native_endian_f(buffer, Endian::BIG), to_native_endian_f(buffer+4, Endian::BIG));
+
+                if (!stream.read(buffer, 8))
+                    assert(false);
+                Vector2 pos = Vector2(to_native_endian_f(buffer, Endian::BIG), to_native_endian_f(buffer+4, Endian::BIG));
+
+                if (!stream.read(buffer, 4))
+                    assert(false);
+                float rotation = to_native_endian_f(buffer, Endian::BIG);
+
+                if (!stream.read(buffer, 4))
+                    assert(false);
+                float zIndex = to_native_endian_f(buffer, Endian::BIG);
+
+                Mesh *mesh=0;
+                Material *material=0;
+                if (meshType == MeshType::SQUARE) mesh=square.get(), material=spikeMat.get();
+                else if (meshType == MeshType::TRIANGLE) mesh = triangle.get(), material=spikeMat.get();
+                else assert(false);
+                Object2D *obj = Object2D::create(mesh, material);
+                obj->position = pos;
+                obj->scale = scale;
+                obj->rotation = rotation;
+                obj->zIndex(zIndex);
+
+                if (colliderType != ColliderType::NONE)
+                    colliders.push_back(DashCollider(obj, (decltype(DashCollider::NONE))colliderType, mesh==triangle.get()));
+            }
+            else assert(false);
+        }
+    }
 
     //for (uintg i = 1; i <= 2000; ++i)
     //{

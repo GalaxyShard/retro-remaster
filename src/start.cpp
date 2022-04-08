@@ -190,13 +190,21 @@ static void init()
     Scene::create("Start");
     
     BinaryWriter writer;
-    writer.write<ucharG>(Header::OBJ2D);
-    writer.write<ucharG>(MeshType::SQUARE);
-    writer.write<ucharG>(ColliderType::AABB);
-    writer.write<Vector2>(Vector2(1,1));
-    writer.write<Vector2>(Vector2(20, -1));
-    writer.write<float>(0);
-    writer.write<float>(0);
+    for (uintg i = 1; i <= 2000; ++i)
+    {
+        uintg numSpikes = rand()%3+1;
+        for (uintg j = 0; j < numSpikes; ++j)
+        {
+            bool isSpike = (rand()%2==0);
+            writer.write<ucharG>(Header::OBJ2D);
+            writer.write<ucharG>(isSpike ? MeshType::TRIANGLE : MeshType::SQUARE);
+            writer.write<ucharG>(isSpike ? ColliderType::TRIANGLE : ColliderType::AABB);
+            writer.write<Vector2>(Vector2(1,1));
+            writer.write<Vector2>(Vector2(14.25*i+2+j, -0.5));
+            writer.write<float>(0);
+            writer.write<float>(0);
+        }
+    }
     std::ofstream output = std::ofstream(Assets::data_path()+"/level0", std::ios::binary);
     if (!output) return;
     output << writer.get_buffer();
