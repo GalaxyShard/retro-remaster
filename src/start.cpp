@@ -1,6 +1,8 @@
 #include <utils.hpp>
+#include <global.hpp>
 
 const char *gameName = "Retro Collection";
+Scene *globalScene;
 
 // for gitpod:
 // source /workspace/emsdk/emsdk_env.sh
@@ -184,36 +186,22 @@ FPSCounter::FPSCounter()
 static void init()
 {
     Font::defaultFont = new Font(Assets::gpath()+"/VT323");
-    Scene::create("Global");
+    globalScene = Scene::create("Global");
     Scene::create("Start");
-
-    // persistant IO on WebGL works but only after FS.syncfs finishes
-    // this code introduces a race condition
-//    {
-//        logmsg("Reading file...\n");
-//        std::ifstream input = std::ifstream(Assets::data_path()+"/testFile.txt");
-//        if (!input)
-//            goto END_READ;
-
-//        char buffer[5];
-//        logmsg("reading to buffer...\n");
-//        if (!input.read(buffer, 4))
-//            goto END_READ;
-//        buffer[4] = '\0';
-//        logmsg("buffer:\'%o\'\n", (char*)buffer);
-//    }
-//END_READ:
-//    std::ofstream output = std::ofstream(Assets::data_path()+"/testFile.txt");
-//    logmsg("writing to file...\n");
-//    if (!output)
-//        return;
-//    logmsg("writing number...\n");
-//    int random = rand()%9000+1000;
-//    output << random;
-//    if (!output)
-//        return;
-//    logmsg("wrote \'%o\' to file\n", random);
-//    Assets::sync_files();
+    
+    BinaryWriter writer;
+    writer.write<ucharG>(Header::OBJ2D);
+    writer.write<ucharG>(MeshType::SQUARE);
+    writer.write<ucharG>(ColliderType::AABB);
+    writer.write<Vector2>(Vector2(1,1));
+    writer.write<Vector2>(Vector2(20, -1));
+    writer.write<float>(0);
+    writer.write<float>(0);
+    std::ofstream output = std::ofstream(Assets::data_path()+"/level0", std::ios::binary);
+    if (!output) return;
+    output << writer.get_buffer();
+    if (!output) return;
+    Assets::sync_files();
 
 }
 INIT_FUNC(init);

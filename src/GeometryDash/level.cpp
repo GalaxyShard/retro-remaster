@@ -3,7 +3,7 @@ struct DashCollider
 {
     Object2D *obj;
     Vector2 points[4];
-    enum {AABB,TRIANGLE} type;
+    enum {NONE,AABB,TRIANGLE} type;
     bool killOnTouch;
     DashCollider(Object2D *obj, decltype(type) type, bool killOnTouch)
         : obj(obj), type(type), killOnTouch(killOnTouch) { generate(); }
@@ -62,7 +62,6 @@ void DashCollider::generate()
         points[3] = Vector2( 1,  1);
         for (uintg i = 0; i < 4; ++i)
             points[i] = obj->position + (halfScale*points[i]);
-        
     }
     else if (type == DashCollider::TRIANGLE)
     {
@@ -167,16 +166,14 @@ static DashCollisionData test_collision(Vector2 *player, DashCollider *collider)
 
         return DashCollisionData(mtv);
     }
+    logerr("Collider not recognized: %d\n", collider->type);
     return DashCollisionData();
 }
 float move_towards(float current, float goal, float speed)
 {
     float to = goal - current;
     if (to <= speed) return goal;
-
     return current + speed;
-    //float inverseDist = 1.f / to;
-    //return current + to * inverseDist * speed;
 }
 void DashLevel::handle_touch(TouchData data)
 {
@@ -184,7 +181,6 @@ void DashLevel::handle_touch(TouchData data)
 }
 void DashLevel::pre_render()
 {
-
     vel.y += gravity * Time::delta();
     if (jump && isGrounded)
     {
@@ -212,17 +208,8 @@ void DashLevel::pre_render()
     tempPlayer[5] = playerPoints[5];
     bool didCollide = 0;
 
-    //float camPosX = Camera::main->position.x;
-    //float camScaleX = Camera::main->orthoSize*Renderer::aspectRatio.x;
-    //float camMin = camPosX-camScaleX;
-    //float camMax = camPosX+camScaleX;
     for (auto &collider : colliders)
     {
-        //float objPos = collider.obj->position.x;
-        //float halfObj = collider.obj->scale.x*0.5f;
-        //collider.obj->enabled = test_aabb_1D(objPos-halfObj, objPos+halfObj, camMin, camMax);
-        //if (!collider.obj->enabled) continue;
-
         for (uintg i = 0; i < 4; ++i)
             tempPlayer[i] = player->position + playerPoints[i];
         
@@ -292,8 +279,6 @@ DashLevel::DashLevel()
     player->scale = Vector2(1, 1);
     player->position = Vector2(0, -0.75);
     player->zIndex(1);
-    //player->zIndex;
-    //player->position.z = 1;
 
     otherMat = std::make_unique<Material>(colShader.get());
     otherMat->set_uniform("u_color", Vector4(0.3,0.3,0.5,1));
@@ -303,23 +288,36 @@ DashLevel::DashLevel()
 
     spikeMat = std::make_unique<Material>(colShader.get());
     spikeMat->set_uniform("u_color", Vector4(0.75,0.75,0.75,1));
-    for (uintg i = 1; i <= 2000; ++i)
-    {
-        Object2D *test = Object2D::create(square.get(), spikeMat.get());
-        test->scale = Vector2(0.35,1);
-        test->position = Vector2(i*14.25, -1.75);
-
-        uintg numSpikes = rand()%3+1;
-        for (uintg j = 0; j < numSpikes; ++j)
-        {
-            bool isSpike = (rand()%2==0);
-            Object2D *spike = Object2D::create(isSpike ? triangle.get() : square.get(), spikeMat.get());
-            spike->position = Vector2(i*14.25+2+j,-0.5);
-            colliders.push_back(DashCollider(spike, isSpike ? DashCollider::TRIANGLE : DashCollider::AABB, isSpike));
-        }
-    }
 
     colliders.push_back(DashCollider(other, DashCollider::AABB, 0));
+
+    // header -> ucharG enum
+    // mesh type -> ucharG enum?
+    // collider type -> ucharG enum
+    // scale -> vec2
+    // pos -> vec2
+    // rotation -> float
+    // z-index -> float
+
+    std::ifstream stream = std::ifstream(Assets::data_path()+"/level0", std::ios::binary);
+    // todo: loop over stream and deserialize objects
+
+    //for (uintg i = 1; i <= 2000; ++i)
+    //{
+    //    Object2D *test = Object2D::create(square.get(), spikeMat.get());
+    //    test->scale = Vector2(0.35,1);
+    //    test->position = Vector2(i*14.25, -1.75);
+    //
+    //    uintg numSpikes = rand()%3+1;
+    //    for (uintg j = 0; j < numSpikes; ++j)
+    //    {
+    //        bool isSpike = (rand()%2==0);
+    //        Object2D *spike = Object2D::create(isSpike ? triangle.get() : square.get(), spikeMat.get());
+    //        spike->position = Vector2(i*14.25+2+j,-0.5);
+    //        colliders.push_back(DashCollider(spike, isSpike ? DashCollider::TRIANGLE : DashCollider::AABB, isSpike));
+    //    }
+    //}
+
 
     Input::add_bind("jump", Key::Space, [this](bool p){jump=p;});
 }
