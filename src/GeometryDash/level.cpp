@@ -4,7 +4,7 @@ struct DashCollider
 {
     Object2D *obj;
     Vector2 points[4];
-    enum {NONE,AABB,TRIANGLE} type;
+    enum : ucharG {NONE,AABB,TRIANGLE} type;
     bool killOnTouch;
     DashCollider(Object2D *obj, decltype(type) type, bool killOnTouch)
         : obj(obj), type(type), killOnTouch(killOnTouch) { generate(); }
@@ -192,7 +192,8 @@ void DashLevel::pre_render()
 
     Vector2 playerPoints[6];
     {
-        Matrix2x2 rot = Matrix2x2::rotate(player->rotation);
+        //Matrix2x2 rot = Matrix2x2::rotate(player->rotation);
+        Matrix2x2 rot = Matrix2x2::identity();
         Vector2 corner = player->scale*0.5f;
         playerPoints[0] = Vector2(-1, -1);
         playerPoints[1] = Vector2( 1, -1);
@@ -292,49 +293,32 @@ DashLevel::DashLevel()
 
     colliders.push_back(DashCollider(other, DashCollider::AABB, 0));
 
+    // File format
     // header -> ucharG enum
     // mesh type -> ucharG enum?
     // collider type -> ucharG enum
-    // scale -> vec2
     // pos -> vec2
+    // scale -> vec2
     // rotation -> float
     // z-index -> float
 
-    std::ifstream stream = std::ifstream(Assets::data_path()+"/level0", std::ios::binary);
-    if (stream)
+    BinaryFileReader reader = BinaryFileReader(Assets::data_path()+"/level0");
+    if (reader)
     {
-        char buffer[64];
-        while (1)
+        while(1)
         {
-            // todo: redesign BinaryReader in a less OO style to use with this and audio loading
-            if (!stream.read(buffer, 1))
+            ucharG header = reader.read<ucharG>();
+            if (!reader)
                 break;
-            ucharG header = *buffer;
             if (header == Header::OBJ2D)
             {
-                if (!stream.read(buffer, 1))
-                    assert(false);
-                ucharG meshType = *buffer;
-
-                if (!stream.read(buffer, 1))
-                    assert(false);
-                ucharG colliderType = *buffer;
-
-                if (!stream.read(buffer, 8))
-                    assert(false);
-                Vector2 scale = Vector2(to_native_endian_f(buffer, Endian::BIG), to_native_endian_f(buffer+4, Endian::BIG));
-
-                if (!stream.read(buffer, 8))
-                    assert(false);
-                Vector2 pos = Vector2(to_native_endian_f(buffer, Endian::BIG), to_native_endian_f(buffer+4, Endian::BIG));
-
-                if (!stream.read(buffer, 4))
-                    assert(false);
-                float rotation = to_native_endian_f(buffer, Endian::BIG);
-
-                if (!stream.read(buffer, 4))
-                    assert(false);
-                float zIndex = to_native_endian_f(buffer, Endian::BIG);
+                ucharG meshType = reader.read<ucharG>();
+                ucharG colliderType = reader.read<ucharG>();
+                Vector2 pos = reader.read<Vector2>();
+                Vector2 scale = reader.read<Vector2>();
+                float rotation = reader.read<float>();
+                float zIndex = reader.read<float>();
+                assert(reader);
 
                 Mesh *mesh=0;
                 Material *material=0;
@@ -353,23 +337,6 @@ DashLevel::DashLevel()
             else assert(false);
         }
     }
-
-    //for (uintg i = 1; i <= 2000; ++i)
-    //{
-    //    Object2D *test = Object2D::create(square.get(), spikeMat.get());
-    //    test->scale = Vector2(0.35,1);
-    //    test->position = Vector2(i*14.25, -1.75);
-    //
-    //    uintg numSpikes = rand()%3+1;
-    //    for (uintg j = 0; j < numSpikes; ++j)
-    //    {
-    //        bool isSpike = (rand()%2==0);
-    //        Object2D *spike = Object2D::create(isSpike ? triangle.get() : square.get(), spikeMat.get());
-    //        spike->position = Vector2(i*14.25+2+j,-0.5);
-    //        colliders.push_back(DashCollider(spike, isSpike ? DashCollider::TRIANGLE : DashCollider::AABB, isSpike));
-    //    }
-    //}
-
 
     Input::add_bind("jump", Key::Space, [this](bool p){jump=p;});
 }

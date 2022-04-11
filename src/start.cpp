@@ -185,6 +185,11 @@ FPSCounter::FPSCounter()
 }
 static void init()
 {
+    // linear: t
+    // ease in/out (bezier): t*t*(3.f - 2.f*t)
+    // ease in: t*t
+    // ease out: 1-(1-t)*(1-t)
+
     Font::defaultFont = new Font(Assets::gpath()+"/VT323");
     globalScene = Scene::create("Global");
     Scene::create("Start");
@@ -199,8 +204,8 @@ static void init()
             writer.write<ucharG>(Header::OBJ2D);
             writer.write<ucharG>(isSpike ? MeshType::TRIANGLE : MeshType::SQUARE);
             writer.write<ucharG>(isSpike ? ColliderType::TRIANGLE : ColliderType::AABB);
-            writer.write<Vector2>(Vector2(1,1));
             writer.write<Vector2>(Vector2(14.25*i+2+j, -0.5));
+            writer.write<Vector2>(Vector2(1,1));
             writer.write<float>(0);
             writer.write<float>(0);
         }
