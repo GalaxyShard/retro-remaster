@@ -1,5 +1,30 @@
 #include <utils.hpp>
 #include <global.hpp>
+
+
+/*
+    DashMenu
+        Level button - loads selected level and runs it
+        Editor button - loads selected level and the editor
+        Level selector - textfield (difficult to implement), stepper (simple, two buttons and a text), or slider (difficult to use)
+        Use globalScene->add_component<DashSceneData>(); to pass data between scenes
+    DashEditor
+        Save button
+        Execute button - Saves the level, then loads DashLevel scene if successfully saved (add a callback for asset refresh for webgl)
+        Camera panning
+        Buttons to place/delete/move objects
+        Click to select objects
+    DashLevel
+        Pause button
+            Resume button
+            Exit button (goes back to previous scene, either editor or menu)
+        Physics
+        Load level file on startup, immediately start level after loading
+
+    DashPhysics.hpp
+    DashPhysics.cpp
+*/
+
 struct DashCollider
 {
     Object2D *obj;
@@ -161,7 +186,8 @@ static DashCollisionData test_collision(Vector2 *player, DashCollider *collider)
     {
         numPoints = 3;
 
-        if (!testAxis(player[4]) || !testAxis(player[5])
+        // Test 1,0 for efficiency, not required
+        if (!testAxis(Vector2(1, 0)) || !testAxis(player[4]) || !testAxis(player[5])
             || !testAxis(Vector2(0,1)) || !testAxis(triangleNorm0) || !testAxis(triangleNorm1))
             return DashCollisionData();
 
@@ -173,8 +199,12 @@ static DashCollisionData test_collision(Vector2 *player, DashCollider *collider)
 float move_towards(float current, float goal, float speed)
 {
     float to = goal - current;
-    if (to <= speed) return goal;
-    return current + speed;
+    float s = abs(speed);
+    if (abs(to) <= s) return goal;
+    if (current < goal)
+        return current + s;
+    else
+        return current - s;
 }
 void DashLevel::handle_touch(TouchData data)
 {
@@ -192,8 +222,8 @@ void DashLevel::pre_render()
 
     Vector2 playerPoints[6];
     {
-        //Matrix2x2 rot = Matrix2x2::rotate(player->rotation);
-        Matrix2x2 rot = Matrix2x2::identity();
+        Matrix2x2 rot = Matrix2x2::rotate(player->rotation);
+        // Matrix2x2 rot = Matrix2x2::identity();
         Vector2 corner = player->scale*0.5f;
         playerPoints[0] = Vector2(-1, -1);
         playerPoints[1] = Vector2( 1, -1);
@@ -234,7 +264,9 @@ void DashLevel::pre_render()
     {
         vel.y = -0.1;
         float increment = Math::PI*0.5f;
-        player->rotation = -move_towards(-player->rotation, roundf(-player->rotation/increment)*increment, 10*Time::delta());
+        float r = -player->rotation;
+        float toR = roundf(r/increment)*increment;
+        player->rotation = -move_towards(r, toR, std::max(abs(r-toR)*15, 1.f)*Time::delta());
         isGrounded = 1;
     }
     else 
