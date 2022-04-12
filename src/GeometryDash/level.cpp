@@ -1,5 +1,6 @@
 #include <utils.hpp>
 #include <global.hpp>
+#include <GeometryDash/dash.hpp>
 
 
 /*
@@ -55,6 +56,8 @@ struct DashLevel
 
     std::unique_ptr<AudioPlayer> bgAudio;
     std::unique_ptr<Material> playerMat, otherMat, spikeMat;
+
+    UIText *coordsText;
 
     std::vector<DashCollider> colliders;
     Object2D *player;
@@ -212,7 +215,8 @@ void DashLevel::handle_touch(TouchData data)
 }
 void DashLevel::pre_render()
 {
-    vel.y += gravity * Time::delta();
+    if (!isGrounded)
+        vel.y += gravity * Time::delta();
     if (jump && isGrounded)
     {
         vel.y = sqrt(jumpHeight*2*-gravity);
@@ -262,7 +266,7 @@ void DashLevel::pre_render()
     }
     if (didCollide)
     {
-        vel.y = -0.1;
+        vel.y = -1;
         float increment = Math::PI*0.5f;
         float r = -player->rotation;
         float toR = roundf(r/increment)*increment;
@@ -276,6 +280,11 @@ void DashLevel::pre_render()
     }
     player->dirtyBounds();
     Camera::main->position.x = player->position.x + 7.5f;
+
+    char buffer[16];
+    snprintf(buffer, 16, "%d, %d", (int)Camera::main->position.x, (int)Camera::main->position.y);
+    coordsText->str = buffer;
+    coordsText->refresh();
 }
 DashLevel::DashLevel()
 {
@@ -306,6 +315,11 @@ DashLevel::DashLevel()
         Scene::destroy(Scene::activeScene);
         Scene::create("Dash");
     };
+    coordsText = UIText::create("0, 0");
+    coordsText->anchor = Vector2(0, -1);
+    coordsText->pivot = Vector2(0, 0);
+    coordsText->scale = Vector2(0.5, 0.1);
+    coordsText->pos = Vector2(0, 0.05f);
 
     playerMat = std::make_unique<Material>(colShader.get());
     playerMat->set_uniform("u_color", Vector4(1,1,1,1));
@@ -333,8 +347,9 @@ DashLevel::DashLevel()
     // scale -> vec2
     // rotation -> float
     // z-index -> float
+    uintg level = globalScene->get_component<DashSceneData>()->level;
 
-    BinaryFileReader reader = BinaryFileReader(Assets::data_path()+"/level0");
+    BinaryFileReader reader = BinaryFileReader(Assets::data_path()+"/level"+std::to_string(level));
     if (reader)
     {
         while(1)

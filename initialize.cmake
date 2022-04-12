@@ -15,4 +15,10 @@ set(GAME_SRC
     src/utils.cpp
     src/GeometryDash/menu.cpp
     src/GeometryDash/level.cpp
+    src/GeometryDash/editor.cpp
+)
+set(GAME_HEADERS
+    src/GeometryDash/dash.hpp
+    src/global.hpp
+    src/utils.hpp
 )
