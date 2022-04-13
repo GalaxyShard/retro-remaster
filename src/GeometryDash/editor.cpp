@@ -10,7 +10,7 @@ struct DashEditor
 
     ListenerT<TouchData> inputConn;
 
-    UIText *coordsText;
+    UIText *coordsText, *saveText;
 
     void handle_touch(TouchData data);
 
@@ -51,6 +51,34 @@ DashEditor::DashEditor()
         Scene::destroy(Scene::activeScene);
         Scene::create("Dash");
     };
+
+    UIImage *saveBtn = UIImage::create();
+    saveBtn->anchor = Vector2(-1, 1);
+    saveBtn->scale = Vector2(0.35, 0.15);
+    saveBtn->pos = Vector2(0.175f, -saveBtn->scale.y/2);
+    saveBtn->onClick = [this]()
+    {
+        saveText->str = "Saving...";
+        saveText->refresh();
+        // TODO: save
+        Assets::sync_files([this](bool success)
+        {
+            saveText->str = success ? "Saved" : "Failed";
+            saveText->refresh();
+            /*
+                TODO: add a timer to game engine
+                Timer::wait([this](){ saveText->str = "Save"; saveText->refresh(); });
+                Possibly add some kind of animation/transition library as well
+                Animate::image(img, 0.5, [](UIImageData *out) { out.pos = Vector2(0,1); });
+                or
+                UIImageData data;
+                data.pos = Vector2(0,1);
+                Animate::text(txt, 0.5, data);
+            */
+        });
+    };
+    saveText = text_for_img("Save", saveBtn);
+
     coordsText = UIText::create("0, 0");
     coordsText->anchor = Vector2(0, -1);
     coordsText->pivot = Vector2(0, 0);
