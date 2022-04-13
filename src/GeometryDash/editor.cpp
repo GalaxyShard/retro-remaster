@@ -1,6 +1,13 @@
 #include <utils.hpp>
 #include <global.hpp>
 #include <GeometryDash/dash.hpp>
+
+struct DashObjectData
+{
+    Object2D *obj;
+
+};
+
 struct DashEditor
 {
     AssetRef<Texture> menuTex;
@@ -10,9 +17,17 @@ struct DashEditor
 
     ListenerT<TouchData> inputConn;
 
+    std::vector<DashObjectData> objects;
+
     UIText *coordsText, *saveText;
 
+    uintg saveSlot = 0;
+    uintg timerID = ~0u;
+    bool saveDebounce = 0;
+
     void handle_touch(TouchData data);
+    void save_finished(bool success);
+    void save_game();
 
     DashEditor();
     ~DashEditor();
@@ -25,6 +40,50 @@ void DashEditor::handle_touch(TouchData data)
     snprintf(buffer, 16, "%d, %d", (int)camPos.x, (int)camPos.y);
     coordsText->str = buffer;
     coordsText->refresh();
+}
+void DashEditor::save_finished(bool success)
+{
+    saveText->str = success ? "Saved" : "Failed";
+    saveText->refresh();
+    timerID = Timer::wait(0.5f, [this]()
+    {
+        timerID = ~0u;
+        saveText->str = "Save";
+        saveText->refresh();
+        saveDebounce = 0;
+    });
+    /*
+        Possibly add some kind of animation/transition library to engine
+        Animate::image(img, 0.5, [](UIImageData *out) { out.pos = Vector2(0,1); });
+        or
+        UIImageData data;
+        data.pos = Vector2(0,1);
+        Animate::text(txt, 0.5, data);
+    */
+}
+void DashEditor::save_game()
+{
+    if (saveDebounce)
+        return;
+    saveDebounce = 1;
+    saveText->str = "Saving...";
+    saveText->refresh();
+
+    BinaryWriter writer;
+    std::ostream out = std::ostream(Assets::data_path()+"/level"+std::to_string(saveSlot), std::ios::binary);
+    if (!out)
+    {
+        save_finished(0);
+        return;
+    }
+    out << writer.get_buffer();
+    if (!out)
+    {
+        save_finished(0);
+        return;
+    }
+
+    Assets::sync_files(TYPE_LAMBDA(save_finished, bool));
 }
 DashEditor::DashEditor()
 {
@@ -56,27 +115,8 @@ DashEditor::DashEditor()
     saveBtn->anchor = Vector2(-1, 1);
     saveBtn->scale = Vector2(0.35, 0.15);
     saveBtn->pos = Vector2(0.175f, -saveBtn->scale.y/2);
-    saveBtn->onClick = [this]()
-    {
-        saveText->str = "Saving...";
-        saveText->refresh();
-        // TODO: save
-        Assets::sync_files([this](bool success)
-        {
-            saveText->str = success ? "Saved" : "Failed";
-            saveText->refresh();
-            /*
-                TODO: add a timer to game engine
-                Timer::wait([this](){ saveText->str = "Save"; saveText->refresh(); });
-                Possibly add some kind of animation/transition library as well
-                Animate::image(img, 0.5, [](UIImageData *out) { out.pos = Vector2(0,1); });
-                or
-                UIImageData data;
-                data.pos = Vector2(0,1);
-                Animate::text(txt, 0.5, data);
-            */
-        });
-    };
+    saveBtn->onClick = save_game;
+
     saveText = text_for_img("Save", saveBtn);
 
     coordsText = UIText::create("0, 0");
@@ -95,9 +135,9 @@ DashEditor::DashEditor()
 
     spikeMat = std::make_unique<Material>(colShader.get());
     spikeMat->set_uniform("u_color", Vector4(0.75,0.75,0.75,1));
-    uintg level = globalScene->get_component<DashSceneData>()->level;
+    saveSlot = globalScene->get_component<DashSceneData>()->level;
 
-    BinaryFileReader reader = BinaryFileReader(Assets::data_path()+"/level"+std::to_string(level));
+    BinaryFileReader reader = BinaryFileReader(Assets::data_path()+"/level"+std::to_string(saveSlot));
     if (reader)
     {
         while(1)
@@ -125,6 +165,10 @@ DashEditor::DashEditor()
                 obj->scale = scale;
                 obj->rotation = rotation;
                 obj->zIndex(zIndex);
+
+                DashObjectData data;
+                data.obj = obj;
+                objects.push_back(data);
             }
             else assert(false);
         }
@@ -132,6 +176,9 @@ DashEditor::DashEditor()
 }
 DashEditor::~DashEditor()
 {
+    if (timerID != ~0u)
+        Timer::cancel(timerID);
+
     Renderer::set_clear_color(0,0,0,1);
     Camera::main->reset();
 }
