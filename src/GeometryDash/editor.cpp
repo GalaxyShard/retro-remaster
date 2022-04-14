@@ -23,6 +23,7 @@ struct DashEditor
     UIImage *trashBtn, *panBtn, *moveBtn;
     UIText *coordsText, *saveText;
 
+    uintg selectedObj = ~0u;
     uintg saveSlot = 0;
     uintg timerID = ~0u;
     ucharG currentState = DashEditState::PAN;
@@ -32,6 +33,7 @@ struct DashEditor
     void save_finished(bool success);
     void save_game();
     void set_state(ucharG state);
+    uintg find_obj(Vector2 screenPos);
 
     DashEditor();
     ~DashEditor();
@@ -52,6 +54,21 @@ void DashEditor::set_state(ucharG state)
     else if (state == DashEditState::MOVE) moveBtn->tint = enabled;
     else if (state == DashEditState::TRASH) trashBtn->tint = enabled;
 }
+uintg DashEditor::find_obj(Vector2 screenPos)
+{
+    Vector2 pos = (Vector2)Camera::main->position + screenPos*Camera::main->orthoSize;
+    for (uintg i = 0; i < objData.size(); ++i)
+    {
+        Object2D *obj = objData[i].obj;
+        Vector2 halfScale = obj->scale*0.5;
+        Vector2 objPos = obj->position;
+        Vector2 min = objPos - halfScale;
+        Vector2 max = objPos + halfScale;
+        if (Math::within(pos.x, min.x, max.x) && Math::within(pos.y, min.y, max.y))
+            return i;
+    }
+    return ~0u;
+}
 void DashEditor::handle_touch(TouchData data)
 {
     if (currentState == DashEditState::PAN)
@@ -62,6 +79,32 @@ void DashEditor::handle_touch(TouchData data)
         snprintf(buffer, 16, "%d, %d", (int)camPos.x, (int)camPos.y);
         coordsText->str = buffer;
         coordsText->refresh();
+    }
+    else if (currentState == DashEditState::TRASH)
+    {
+        if (data.state == TouchState::PRESSED)
+        {
+            uintg index = find_obj(data.pos);
+            if (index != ~0u)
+            {
+                Object2D::destroy(objData[index].obj);
+                objData.erase(objData.begin()+index);
+            }
+        }
+    }
+    else if (currentState == DashEditState::MOVE)
+    {
+        if (data.state == TouchState::PRESSED)
+        {
+            selectedObj = find_obj(data.pos);
+        }
+        else if (data.state == TouchState::MOVED)
+        {
+            if (selectedObj != ~0u)
+            {
+                objData[selectedObj].obj->position += data.delta*Camera::main->orthoSize;
+            }
+        }
     }
 }
 void DashEditor::save_finished(bool success)
@@ -108,7 +151,7 @@ void DashEditor::save_game()
             meshType = MeshType::SQUARE, colliderType = ColliderType::AABB;
         else if (data.obj->mesh == triangle.get())
             meshType = MeshType::TRIANGLE, colliderType = ColliderType::TRIANGLE;
-        else assert(false && "unsupported mesh");
+        else throw("unsupported mesh");
 
         writer.write<ucharG>(Header::OBJ2D);
         writer.write<ucharG>(meshType);
@@ -183,6 +226,34 @@ DashEditor::DashEditor()
     text_for_img("Trash", trashBtn);
 
     set_state(DashEditState::PAN);
+
+    UIImage *cubeBtn = UIImage::create();
+    cubeBtn->anchor = Vector2(1, -1);
+    cubeBtn->scale = Vector2(0.35, 0.15);
+    cubeBtn->pos = Vector2(-0.175f, 0.075);
+    cubeBtn->onClick = [this]()
+    {
+        Object2D *obj = Object2D::create(square.get(), spikeMat.get());
+        obj->position = Camera::main->position;
+        DashObjectData data;
+        data.obj = obj;
+        objData.push_back(data);
+    };
+    text_for_img("New Square", cubeBtn);
+
+    UIImage *spikeBtn = UIImage::create();
+    spikeBtn->anchor = Vector2(1, -1);
+    spikeBtn->scale = Vector2(0.35, 0.15);
+    spikeBtn->pos = Vector2(-0.175f, 0.075*2);
+    spikeBtn->onClick = [this]()
+    {
+        Object2D *obj = Object2D::create(triangle.get(), spikeMat.get());
+        obj->position = Camera::main->position;
+        DashObjectData data;
+        data.obj = obj;
+        objData.push_back(data);
+    };
+    text_for_img("New Spike", spikeBtn);
 
     coordsText = UIText::create("0, 0");
     coordsText->anchor = Vector2(0, -1);
