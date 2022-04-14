@@ -7,6 +7,7 @@ struct DashObjectData
     Object2D *obj;
 
 };
+struct DashEditState { enum : ucharG { PAN,MOVE,TRASH }; };
 
 struct DashEditor
 {
@@ -17,29 +18,51 @@ struct DashEditor
 
     ListenerT<TouchData> inputConn;
 
-    std::vector<DashObjectData> objects;
+    std::vector<DashObjectData> objData;
 
+    UIImage *trashBtn, *panBtn, *moveBtn;
     UIText *coordsText, *saveText;
 
     uintg saveSlot = 0;
     uintg timerID = ~0u;
+    ucharG currentState = DashEditState::PAN;
     bool saveDebounce = 0;
 
     void handle_touch(TouchData data);
     void save_finished(bool success);
     void save_game();
+    void set_state(ucharG state);
 
     DashEditor();
     ~DashEditor();
 };
+void DashEditor::set_state(ucharG state)
+{
+    const Vector4 disabled = Vector4(0.75, 0.75, 0.75, 1);
+    const Vector4 enabled = Vector4(1,1,1,1);
+    panBtn->tint = disabled;
+    moveBtn->tint = disabled;
+    trashBtn->tint = disabled;
+
+    if (state == currentState)
+        currentState = DashEditState::PAN;
+    else currentState = state;
+    
+    if (state == DashEditState::PAN) panBtn->tint = enabled;
+    else if (state == DashEditState::MOVE) moveBtn->tint = enabled;
+    else if (state == DashEditState::TRASH) trashBtn->tint = enabled;
+}
 void DashEditor::handle_touch(TouchData data)
 {
-    Vector3 &camPos = Camera::main->position;
-    camPos -= data.delta * 10;
-    char buffer[16];
-    snprintf(buffer, 16, "%d, %d", (int)camPos.x, (int)camPos.y);
-    coordsText->str = buffer;
-    coordsText->refresh();
+    if (currentState == DashEditState::PAN)
+    {
+        Vector3 &camPos = Camera::main->position;
+        camPos -= data.delta * 10;
+        char buffer[16];
+        snprintf(buffer, 16, "%d, %d", (int)camPos.x, (int)camPos.y);
+        coordsText->str = buffer;
+        coordsText->refresh();
+    }
 }
 void DashEditor::save_finished(bool success)
 {
@@ -69,13 +92,33 @@ void DashEditor::save_game()
     saveText->str = "Saving...";
     saveText->refresh();
 
-    BinaryWriter writer;
-    std::ostream out = std::ostream(Assets::data_path()+"/level"+std::to_string(saveSlot), std::ios::binary);
+    std::ofstream out = std::ofstream(Assets::data_path()+"/level"+std::to_string(saveSlot), std::ios::binary);
     if (!out)
     {
         save_finished(0);
         return;
     }
+    BinaryWriter writer;
+    for (auto &data : objData)
+    {
+        ucharG meshType;
+        ucharG colliderType;
+
+        if (data.obj->mesh == square.get())
+            meshType = MeshType::SQUARE, colliderType = ColliderType::AABB;
+        else if (data.obj->mesh == triangle.get())
+            meshType = MeshType::TRIANGLE, colliderType = ColliderType::TRIANGLE;
+        else assert(false && "unsupported mesh");
+
+        writer.write<ucharG>(Header::OBJ2D);
+        writer.write<ucharG>(meshType);
+        writer.write<ucharG>(colliderType);
+        writer.write<Vector2>(data.obj->position);
+        writer.write<Vector2>(data.obj->scale);
+        writer.write<float>(data.obj->rotation);
+        writer.write<float>(data.obj->zIndex());
+    }
+
     out << writer.get_buffer();
     if (!out)
     {
@@ -115,9 +158,31 @@ DashEditor::DashEditor()
     saveBtn->anchor = Vector2(-1, 1);
     saveBtn->scale = Vector2(0.35, 0.15);
     saveBtn->pos = Vector2(0.175f, -saveBtn->scale.y/2);
-    saveBtn->onClick = save_game;
-
+    saveBtn->onClick = CLASS_LAMBDA(save_game);
     saveText = text_for_img("Save", saveBtn);
+
+    panBtn = UIImage::create();
+    panBtn->anchor = Vector2(-1, -1);
+    panBtn->scale = Vector2(0.35, 0.15);
+    panBtn->pos = Vector2(0.175f, 0.075);
+    panBtn->onClick = [this]() { set_state(DashEditState::PAN); };
+    text_for_img("Pan", panBtn);
+
+    moveBtn = UIImage::create();
+    moveBtn->anchor = Vector2(-1, -1);
+    moveBtn->scale = Vector2(0.35, 0.15);
+    moveBtn->pos = Vector2(0.175f, 0.075*3);
+    moveBtn->onClick = [this]() { set_state(DashEditState::MOVE); };
+    text_for_img("Move", moveBtn);
+
+    trashBtn = UIImage::create();
+    trashBtn->anchor = Vector2(-1, -1);
+    trashBtn->scale = Vector2(0.35, 0.15);
+    trashBtn->pos = Vector2(0.175f, 0.075*5);
+    trashBtn->onClick = [this]() { set_state(DashEditState::TRASH); };
+    text_for_img("Trash", trashBtn);
+
+    set_state(DashEditState::PAN);
 
     coordsText = UIText::create("0, 0");
     coordsText->anchor = Vector2(0, -1);
@@ -168,7 +233,7 @@ DashEditor::DashEditor()
 
                 DashObjectData data;
                 data.obj = obj;
-                objects.push_back(data);
+                objData.push_back(data);
             }
             else assert(false);
         }

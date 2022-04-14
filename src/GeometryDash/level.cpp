@@ -246,6 +246,8 @@ void DashLevel::pre_render()
 
     for (auto &collider : colliders)
     {
+        if (collider.obj->wasCulled())
+            continue;
         for (uintg i = 0; i < 4; ++i)
             tempPlayer[i] = player->position + playerPoints[i];
         
