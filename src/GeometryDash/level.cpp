@@ -1,7 +1,7 @@
 #include <utils.hpp>
 #include <global.hpp>
 #include <GeometryDash/dash.hpp>
-
+#include <GeometryDash/physics.hpp>
 
 /*
     DashMenu
@@ -16,35 +16,18 @@
         Buttons to place/delete/move objects
         Click to select objects
     DashLevel
-        Pause button
-            Resume button
-            Exit button (goes back to previous scene, either editor or menu)
+    *   Pause button
+    *       Resume button
+    *       Exit button (goes back to previous scene, either editor or menu)
         Physics
         Load level file on startup, immediately start level after loading
-
-    DashPhysics.hpp
-    DashPhysics.cpp
 */
-
-struct DashCollider
+struct DashObjData
 {
     Object2D *obj;
-    Vector2 points[4];
-    enum : ucharG {NONE,AABB,TRIANGLE} type;
-    bool killOnTouch;
-    DashCollider(Object2D *obj, decltype(type) type, bool killOnTouch)
-        : obj(obj), type(type), killOnTouch(killOnTouch) { generate(); }
-
-    void generate();
-};
-static const Vector2 triangleNorm0 = (Vector2(0, 0.5) - Vector2(-0.5, -0.5)).unit().perpendicular();
-static const Vector2 triangleNorm1 = (Vector2(0, 0.5) - Vector2( 0.5, -0.5)).unit().perpendicular();
-struct DashCollisionData
-{
-    Vector2 mtv;
-    bool collided;
-    DashCollisionData(Vector2 mtv) : mtv(mtv), collided(1) {}
-    DashCollisionData() : mtv(), collided(0) {}
+    std::unique_ptr<Material> mat;
+    DashObjData(Object2D *obj, Shader *shader)
+        : obj(obj), mat(std::make_unique<Material>(shader)) {}
 };
 struct DashLevel
 {
@@ -55,17 +38,18 @@ struct DashLevel
     AssetRef<Mesh> square, triangle;
 
     std::unique_ptr<AudioPlayer> bgAudio;
-    std::unique_ptr<Material> playerMat, otherMat, spikeMat;
+    std::unique_ptr<Material> playerMat, floorMat, spikeMat;
 
     UIText *coordsText;
 
     std::vector<DashCollider> colliders;
+    std::vector<DashObjData> objData;
     Object2D *player;
 
 
-    float gravity = -25.9f*2;
-    float speed = 10;
+    float gravity = -60.f;
     float jumpHeight = 2;
+    float speed = 10.37f;
     Vector3 vel;
 
     bool jump=0, gameEnded=0, isGrounded=1;
@@ -76,35 +60,6 @@ struct DashLevel
     DashLevel();
     ~DashLevel();
 };
-static bool test_aabb_1D(float min0, float max0, float min1, float max1)
-{
-    return min1<max0 && min0<max1;
-}
-void DashCollider::generate()
-{
-    Vector2 halfScale = obj->scale*0.5f;
-    if (type == DashCollider::AABB)
-    {
-        points[0] = Vector2(-1, -1);
-        points[1] = Vector2( 1, -1);
-        points[2] = Vector2(-1,  1);
-        points[3] = Vector2( 1,  1);
-        for (uintg i = 0; i < 4; ++i)
-            points[i] = obj->position + (halfScale*points[i]);
-    }
-    else if (type == DashCollider::TRIANGLE)
-    {
-        points[0] = Vector2(-1, -1);
-        points[1] = Vector2( 1, -1);
-        points[2] = Vector2( 0,  1);
-        for (uintg i = 0; i < 3; ++i)
-            points[i] = obj->position + (halfScale*points[i]);
-    }
-    else
-    {
-        logerr("Collider not recognized: %d\n", type);
-    }
-}
 void DashLevel::end_game(bool won)
 {
     if (gameEnded)
@@ -122,83 +77,6 @@ void DashLevel::end_game(bool won)
 
     Object2D::destroy(player);
 }
-static void min_max_dot(Vector2 *points, uintg len, Vector2 axis, float &min, float &max)
-{
-    min = Vector2::dot(points[0], axis);
-    max = min;
-    for (uintg i = 0; i < len; ++i)
-    {
-        float product = Vector2::dot(points[i], axis);
-        if (min > product)
-            min = product;
-        
-        if (max < product)
-            max = product;
-    }
-}
-static DashCollisionData test_collision(Vector2 *player, DashCollider *collider)
-{
-    Vector2 mtv;
-    float mtvMag = Math::INF;
-    float minDot[2], maxDot[2];
-    uintg numPoints = 0;
-    
-    auto testAxis = [&](Vector2 axis) -> bool
-    {
-        min_max_dot(player,           4,         axis, minDot[0], maxDot[0]);
-        min_max_dot(collider->points, numPoints, axis, minDot[1], maxDot[1]);
-
-            /*
-                tests
-                <-min0--max0----min1--max1----> 0   correct
-                <-min1--max1----min0--max0----> 0   correct
-
-                <-min0--min1----max0--max1----> 1   correct
-                <-min1--min0----max1--max0----> 1   correct
-
-                <-min0--min1----max1--max0----> 1   correct
-                <-min1--min0----max0--max1----> 1   correct
-            */
-        if (minDot[1]<maxDot[0]
-            && minDot[0]<maxDot[1])
-        {
-            // max1-min0   when 1 is less
-            // min1-max0   when 0 is less
-            float avg[2] = {(minDot[0]+maxDot[0])*0.5f, (minDot[1]+maxDot[1])*0.5f};
-            float overlap = (avg[0] < avg[1]) ? minDot[1]-maxDot[0] : maxDot[1]-minDot[0];
-            if (abs(overlap) < abs(mtvMag))
-            {
-                mtvMag = overlap;
-                mtv = axis*mtvMag;
-            }
-            return 1;
-        }
-        return 0;
-    };
-    if (collider->type == DashCollider::AABB)
-    {
-        numPoints = 4;
-
-        if (!testAxis(Vector2(1, 0)) || !testAxis(Vector2(0, 1))
-            || !testAxis(player[4]) || !testAxis(player[5]))
-            return DashCollisionData();
-
-        return DashCollisionData(mtv);
-    }
-    else if (collider->type == DashCollider::TRIANGLE)
-    {
-        numPoints = 3;
-
-        // Test 1,0 for efficiency, not required
-        if (!testAxis(Vector2(1, 0)) || !testAxis(player[4]) || !testAxis(player[5])
-            || !testAxis(Vector2(0,1)) || !testAxis(triangleNorm0) || !testAxis(triangleNorm1))
-            return DashCollisionData();
-
-        return DashCollisionData(mtv);
-    }
-    logerr("Collider not recognized: %d\n", collider->type);
-    return DashCollisionData();
-}
 float move_towards(float current, float goal, float speed)
 {
     float to = goal - current;
@@ -215,33 +93,26 @@ void DashLevel::handle_touch(TouchData data)
 }
 void DashLevel::pre_render()
 {
-    if (!isGrounded)
-        vel.y += gravity * Time::delta();
     if (jump && isGrounded)
     {
         vel.y = sqrt(jumpHeight*2*-gravity);
     }
     player->position.x += speed * Time::delta();
     player->position.y += vel.y * Time::delta();
+    if (!isGrounded)
+        vel.y += gravity * Time::delta();
 
-    Vector2 playerPoints[6];
+    Vector2 playerPoints[4];
     {
-        Matrix2x2 rot = Matrix2x2::rotate(player->rotation);
-        // Matrix2x2 rot = Matrix2x2::identity();
         Vector2 corner = player->scale*0.5f;
         playerPoints[0] = Vector2(-1, -1);
         playerPoints[1] = Vector2( 1, -1);
         playerPoints[2] = Vector2(-1,  1);
         playerPoints[3] = Vector2( 1,  1);
         for (uintg i = 0; i < 4; ++i)
-            playerPoints[i] = rot*(corner*playerPoints[i]);
-
-        playerPoints[4] = rot * Vector2(1,0);
-        playerPoints[5] = rot * Vector2(0,1);
+            playerPoints[i] = (corner*playerPoints[i]);
     }
-    Vector2 tempPlayer[6];
-    tempPlayer[4] = playerPoints[4];
-    tempPlayer[5] = playerPoints[5];
+    Vector2 tempPlayer[4];
     bool didCollide = 0;
 
     for (auto &collider : colliders)
@@ -251,16 +122,18 @@ void DashLevel::pre_render()
         for (uintg i = 0; i < 4; ++i)
             tempPlayer[i] = player->position + playerPoints[i];
         
-        DashCollisionData data = test_collision(tempPlayer, &collider);
-        player->position += data.mtv;
+        DashCollisionData mainHitbox = test_collision(tempPlayer, &collider);
+        player->position += mainHitbox.mtv;
 
         for (uintg i = 0; i < 4; ++i)
             tempPlayer[i].y -= 0.05f;
-        DashCollisionData groundData = test_collision(tempPlayer, &collider);
-        
-        if (!collider.killOnTouch) didCollide |= groundData.collided;
 
-        if ((collider.killOnTouch && data.collided) || data.mtv.x < -0.1)
+        if (!collider.killOnTouch)
+        {
+            DashCollisionData groundData = test_collision(tempPlayer, &collider);
+            didCollide |= groundData.collided;
+        }
+        if ((collider.killOnTouch && mainHitbox.collided) || mainHitbox.mtv.x < -0.1f)
         {
             end_game(0);
             return;
@@ -268,11 +141,12 @@ void DashLevel::pre_render()
     }
     if (didCollide)
     {
-        vel.y = -1;
+        vel.y = 0;
         float increment = Math::PI*0.5f;
         float r = -player->rotation;
         float toR = roundf(r/increment)*increment;
-        player->rotation = -move_towards(r, toR, std::max(abs(r-toR)*15, 1.f)*Time::delta());
+
+        player->rotation = -move_towards(r, toR, std::max(abs(r-toR)*15, 1.5f)*Time::delta());
         isGrounded = 1;
     }
     else 
@@ -290,7 +164,8 @@ void DashLevel::pre_render()
 }
 DashLevel::DashLevel()
 {
-    Renderer::set_clear_color(0.2,0.2,0.3,1);
+    //Renderer::set_clear_color(0.2,0.2,0.3,1);
+    Camera::main->set_bg(0.2,0.2,0.3);
     Camera::main->orthoSize = 10;
     Camera::main->refresh();
     menuTex = Texture::load(Assets::path()+"/textures/menuButton.png", Texture::Pixel);
@@ -308,11 +183,12 @@ DashLevel::DashLevel()
     bgAudio->loop(1);
     bgAudio->play();
 
-    UIImage *menuButton = UIImage::create(menuTex.get());
-    menuButton->anchor = Vector2(1, 1);
-    menuButton->scale = Vector2(0.15, 0.15);
-    menuButton->pos = Vector2(-0.25f, -menuButton->scale.y/2-0.02);
-    menuButton->onClick = []()
+    UIImage *menuBtn = UIImage::create(menuTex.get());
+	TINT_ON_CLICK(menuBtn, (1,1,1,1), (0.75,0.75,0.75,1));
+    menuBtn->anchor = Vector2(1, 1);
+    menuBtn->scale = Vector2(0.15, 0.15);
+    menuBtn->pos = Vector2(-0.25f, -menuBtn->scale.y/2-0.02);
+    menuBtn->onClick = []()
     {
         Scene::destroy(Scene::activeScene);
         Scene::create("Dash");
@@ -330,16 +206,16 @@ DashLevel::DashLevel()
     player->position = Vector2(0, -0.75);
     player->zIndex(1);
 
-    otherMat = std::make_unique<Material>(colShader.get());
-    otherMat->set_uniform("u_color", Vector4(0.3,0.3,0.5,1));
-    Object2D *other = Object2D::create(square.get(), otherMat.get());
-    other->scale = Vector2(10000, 100);
-    other->position = Vector2(0, -1 - other->scale.y/2);
+    floorMat = std::make_unique<Material>(colShader.get());
+    floorMat->set_uniform("u_color", Vector4(0.3,0.3,0.5,1));
+    Object2D *floor = Object2D::create(square.get(), floorMat.get());
+    floor->scale = Vector2(10000, 100);
+    floor->position = Vector2(0, -1 - floor->scale.y/2);
 
     spikeMat = std::make_unique<Material>(colShader.get());
     spikeMat->set_uniform("u_color", Vector4(0.75,0.75,0.75,1));
 
-    colliders.push_back(DashCollider(other, DashCollider::AABB, 0));
+    colliders.push_back(DashCollider(floor, ColliderType::AABB, 0));
 
     // File format
     // header -> ucharG enum
@@ -370,18 +246,21 @@ DashLevel::DashLevel()
                 assert(reader);
 
                 Mesh *mesh=0;
-                Material *material=0;
-                if (meshType == MeshType::SQUARE) mesh=square.get(), material=spikeMat.get();
-                else if (meshType == MeshType::TRIANGLE) mesh = triangle.get(), material=spikeMat.get();
+                if (meshType == MeshType::SQUARE) mesh=square.get();
+                else if (meshType == MeshType::TRIANGLE) mesh = triangle.get();
                 else assert(false);
-                Object2D *obj = Object2D::create(mesh, material);
+                Object2D *obj = Object2D::create(mesh, nullptr);
                 obj->position = pos;
                 obj->scale = scale;
                 obj->rotation = rotation;
                 obj->zIndex(zIndex);
 
+                DashObjData &data = objData.emplace_back(obj, colShader.get());
+                data.mat->set_uniform("u_color", Vector4(1,1,1,1));
+                obj->material = data.mat.get();
+
                 if (colliderType != ColliderType::NONE)
-                    colliders.push_back(DashCollider(obj, (decltype(DashCollider::NONE))colliderType, mesh==triangle.get()));
+                    colliders.push_back(DashCollider(obj, colliderType, mesh==triangle.get()));
             }
             else assert(false);
         }
@@ -391,7 +270,7 @@ DashLevel::DashLevel()
 }
 DashLevel::~DashLevel()
 {
-    Renderer::set_clear_color(0,0,0,1);
+    //Renderer::set_clear_color(0,0,0,1);
     Input::remove_bind("jump");
     Camera::main->reset();
 }

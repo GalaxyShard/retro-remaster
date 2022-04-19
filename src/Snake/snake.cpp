@@ -1,11 +1,7 @@
-#include <Galaxy/engine.hpp>
+#include <utils.hpp>
 #include <list>
-namespace {
-
-struct Game
+struct Snake
 {
-    Scene *scene;
-
     float speed = 1.f/5;
     int width = 15, height = 15;
     
@@ -18,8 +14,8 @@ struct Game
     Vector2 maxBounds = Vector2(0.9,0.8);
     float tileSize = 1.8f/width;
 #endif
-    std::unique_ptr<Listener> preRenderConn;
-    std::unique_ptr<ListenerT<TouchData>> touchInputConn;
+    Listener preRenderConn;
+    ListenerT<TouchData> touchInputConn;
 
     double lastMove = 0;
     Vector2Int moveDir, lastMoveDir;
@@ -32,10 +28,10 @@ struct Game
     AssetRef<Shader> colShader, texShader, tintShader;
     std::unique_ptr<Material> snakeMat, touchIndicatorMat, playerMat, bgMat, humanMat;
 
-    Object *touchIndicator = 0;
+    Object2D *touchIndicator = 0;
 
-    Object *background, *player, *human;
-    std::vector<Object*> snakeBody;
+    Object2D *background, *player, *human;
+    std::vector<Object2D*> snakeBody;
     std::list<Vector2Int> snakeBodyPos;
 
     UIText *score;
@@ -48,38 +44,35 @@ struct Game
     void pre_render();
     void end_game();
     void move_human();
-    Game();
-    ~Game();
+    Snake();
+    ~Snake();
 };
-//std::unique_ptr<Game> game;
-Game *game = 0;
 
 int random(int min, int max) { return rand()%(max-min)+min; }
-void Game::set_move_dir(int x, int y)
+void Snake::set_move_dir(int x, int y)
 {
     if ((x != 0 && lastMoveDir.x == 0) || (y != 0 && lastMoveDir.y == 0))
         moveDir = Vector2Int(x,y);
 }
-void Game::move_human()
+void Snake::move_human()
 {
     humanTile = Vector2Int(random(-7,7), random(-7,7));
     human->position = get_pos(humanTile);
-    human->position.z = 1;
 }
-void Game::end_game()
+void Snake::end_game()
 {
-    UIImage *image = new UIImage();
+    UIImage *image = UIImage::create();
     image->anchor = Vector2();
     image->tint = Vector4(.5,.5,.5,.75);
     image->scale = Vector2(1,0.3);
-    UIText *text = new UIText("Game over");
+    UIText *text = UIText::create("Game Over");
     text->anchor = Vector2();
     text->pivot = Vector2();
     text->scale = image->scale*0.95;
 
-    preRenderConn->disconnect();
+    preRenderConn.disconnect();
 }
-void Game::pre_render()
+void Snake::pre_render()
 {
     if (moveDir == Vector2Int()) return;
     if (Time::get() > lastMove + speed)
@@ -90,15 +83,14 @@ void Game::pre_render()
 
         playerTile += moveDir;
         player->position = get_pos(playerTile);
-        player->position.z = 10;
         
         if (playerTile == humanTile)
         {
             move_human();
             snakeBodyPos.push_front(Vector2Int());
-            Object *obj = new Object(square.get(), snakeMat.get());
+            Object2D *obj = Object2D::create(square.get(), snakeMat.get());
             snakeBody.push_back(obj);
-            score->text = std::to_string(snakeBody.size());
+            score->str = std::to_string(snakeBody.size());
             score->refresh();
         }
         if (snakeBody.size() != 0)
@@ -146,10 +138,12 @@ void Game::pre_render()
         }
     }
 }
-void Game::touch_changed(TouchData data)
+void Snake::touch_changed(TouchData data)
 {
-    constexpr float activateDist = 0.075f;
+    if (UIImage::get_held(data.id))
+        return;
 
+    constexpr float activateDist = 0.075f;
     if (data.state == PRESSED)
     {
         touchOrigin = data.pos;
@@ -157,12 +151,12 @@ void Game::touch_changed(TouchData data)
         {
             touchIndicatorMat = std::make_unique<Material>(tintShader.get());
             touchIndicatorMat->set_uniform("u_color", Vector4(0.75,0.75,0.75,0.75));
-            touchIndicator = new Object(square.get(), touchIndicatorMat.get());
+            touchIndicator = Object2D::create(square.get(), touchIndicatorMat.get());
+            touchIndicator->zIndex(1000);
             touchCircle = Texture::load(Assets::path()+"/textures/4-circle.png", Texture::Pixel);
             touchIndicatorMat->mainTex = touchCircle.get();
         }
-        touchIndicator->position = touchOrigin*Renderer::aspectRatio;
-        touchIndicator->position.z = -1;
+        touchIndicator->position = touchOrigin;
         touchIndicator->scale = Vector2(activateDist, activateDist)*4;
     }
     else if (data.state == MOVED)
@@ -192,26 +186,26 @@ void Game::touch_changed(TouchData data)
         if (touchIndicator) touchIndicator->scale = Vector2();
     }
 }
-Game::Game()
+Snake::Snake()
 {
-    scene = Scene::activeScene;
+    Camera::main->orthoSize = 1;
+    Camera::main->refresh();
+    Input::add_bind("up", Key::W, [this](bool pressed)
+    { if (pressed) set_move_dir(0,1); });
     
-    Input::add_bind("up", Key::W, (input_callback)[](bool pressed)
-    { if (pressed) game->set_move_dir(0,1); });
+    Input::add_bind("down", Key::S, [this](bool pressed)
+    { if (pressed) set_move_dir(0,-1); });
     
-    Input::add_bind("down", Key::S, (input_callback)[](bool pressed)
-    { if (pressed) game->set_move_dir(0,-1); });
+    Input::add_bind("left", Key::A, [this](bool pressed)
+    { if (pressed) set_move_dir(-1,0); });
     
-    Input::add_bind("left", Key::A, (input_callback)[](bool pressed)
-    { if (pressed) game->set_move_dir(-1,0); });
-    
-    Input::add_bind("right", Key::D, (input_callback)[](bool pressed)
-    { if (pressed) game->set_move_dir(1,0); });
+    Input::add_bind("right", Key::D, [this](bool pressed)
+    { if (pressed) set_move_dir(1,0); });
 
-    touchInputConn = Input::touch_changed().connect([](TouchData data) { game->touch_changed(data); });
-    preRenderConn = Renderer::pre_render().connect([]() { game->pre_render(); });
+    touchInputConn = Input::touch_changed().connect(TYPE_LAMBDA(touch_changed, TouchData));
+    preRenderConn = Renderer::pre_render().connect(CLASS_LAMBDA(pre_render));
 
-    square = Mesh::from_obj(Assets::gpath()+"/models/square.obj");
+    square = Mesh::load_obj(Assets::gpath()+"/models/square.obj");
     colShader = Shader::load(Assets::gpath()+SHADER_FOLDER+"/color.shader");
     texShader = Shader::load(Assets::gpath()+SHADER_FOLDER+"/texture.shader");
     tintShader = Shader::load(Assets::gpath()+SHADER_FOLDER+"/tint.shader");
@@ -227,73 +221,58 @@ Game::Game()
 
     bgMat = std::make_unique<Material>(texShader.get());
     bgMat->mainTex = tileTex.get();
-    background = new Object(square.get(), bgMat.get());
-    //background->render_order(-1000);
+    background = Object2D::create(square.get(), bgMat.get());
     background->scale = maxBounds - minBounds;
     background->position = (minBounds + maxBounds)/2;
-    background->position.z = -1000;
+    background->zIndex(-1000);
 
     playerMat = std::make_unique<Material>(texShader.get());
     playerMat->mainTex = playerTex.get();
-    player = new Object(square.get(), playerMat.get());
+    player = Object2D::create(square.get(), playerMat.get());
     player->scale = Vector2(tileSize, tileSize);
     player->position = get_pos(Vector2Int()); // center UFO
-    player->position.z = 10;
-    //player->render_order(10);
+    player->zIndex(10);
 
     humanMat = std::make_unique<Material>(texShader.get());
     humanMat->mainTex = humanTex.get();
-    human = new Object(square.get(), humanMat.get());
+    human = Object2D::create(square.get(), humanMat.get());
     human->scale = Vector2(tileSize, tileSize);
-    //human->render_order(1);
     move_human();
-    human->position.z = 1;
+    human->zIndex(1);
 
-    UIImage *menuButton = new UIImage(menuTex.get());
-    menuButton->anchor = Vector2(1, 1);
-    menuButton->scale = Vector2(0.15, 0.15);
+    UIImage *menuBtn = UIImage::create(menuTex.get());
+	TINT_ON_CLICK(menuBtn, (1,1,1,1), (0.75,0.75,0.75,1));
+    menuBtn->anchor = Vector2(1, 1);
+    menuBtn->scale = Vector2(0.15, 0.15);
 
-    menuButton->pos = -menuButton->scale/2-0.02;
-    menuButton->onClick = []()
+    menuBtn->pos = -menuBtn->scale/2-0.02;
+    menuBtn->onClick = []()
     {
-        delete game;
-        game = nullptr;
-        new Scene("Start");
+        Scene::destroy(Scene::activeScene);
+        Scene::create("Start");
     };
-    UIImage *restartBtn = new UIImage(restartTex.get());
+    UIImage *restartBtn = UIImage::create(restartTex.get());
     restartBtn->anchor = Vector2(-1, 1);
     restartBtn->scale = Vector2(0.15, 0.15);
 
     restartBtn->pos = Vector2(0.35f, -restartBtn->scale.y/2-0.02);
     restartBtn->onClick = []()
     {
-        delete game;
-        game = nullptr;
-        new Scene("Snake");
+        Scene::destroy(Scene::activeScene);
+        Scene::create("Snake");
     };
-    score = new UIText("0");
+    score = UIText::create("0");
     score->anchor = Vector2(-1,1);
     score->pivot = Vector2(0,0);
     score->scale = Vector2(0.15, 0.15);
     score->pos = Vector2(0.2f, -0.1f);
 }
-Game::~Game()
+Snake::~Snake()
 {
+    Camera::main->reset();
     Input::remove_bind("up");
     Input::remove_bind("down");
     Input::remove_bind("left");
     Input::remove_bind("right");
-    delete scene;
 }
-void first()
-{
-    //Scene::set_create_callback("Snake", []() { game = std::make_unique<Game>(); });
-    Scene::set_create_callback("Snake", []() { game = new Game(); });
-}
-FIRST_INIT_FUNC(first);
-//void clean()
-//{
-//    game = nullptr;
-//}
-//CLEANUP_FUNC(clean);
-}
+ADD_SCENE_COMPONENT("Snake", Snake);

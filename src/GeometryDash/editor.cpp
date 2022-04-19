@@ -2,57 +2,79 @@
 #include <global.hpp>
 #include <GeometryDash/dash.hpp>
 
-struct DashObjectData
+constexpr uintg NO_OBJ = ~0u;
+struct EditorObjData
 {
     Object2D *obj;
-
+    std::unique_ptr<Material> mat;
+    Vector4 color;
+    EditorObjData(Object2D *obj, Shader *shader)
+        : obj(obj), mat(std::make_unique<Material>(shader)) {}
 };
-struct DashEditState { enum : ucharG { PAN,MOVE,TRASH }; };
+struct DashEditState { enum : ucharG { PAN,TRASH }; };
 
 struct DashEditor
 {
     AssetRef<Texture> menuTex;
     AssetRef<Shader> colShader, tintShader;
     AssetRef<Mesh> square, triangle;
-    std::unique_ptr<Material> otherMat, spikeMat;
+    std::unique_ptr<Material> floorMat, spikeMat;
 
     ListenerT<TouchData> inputConn;
 
-    std::vector<DashObjectData> objData;
+    std::vector<EditorObjData> objData;
 
-    UIImage *trashBtn, *panBtn, *moveBtn;
+    UIImage *trashBtn, *panBtn;
     UIText *coordsText, *saveText;
 
-    uintg selectedObj = ~0u;
+    uintg selectedObj = NO_OBJ;
     uintg saveSlot = 0;
     uintg timerID = ~0u;
     ucharG currentState = DashEditState::PAN;
     bool saveDebounce = 0;
+    bool snap = 1;
 
     void handle_touch(TouchData data);
     void save_finished(bool success);
-    void save_game();
+    void save_game(bool exitOnFinish = 0);
     void set_state(ucharG state);
     uintg find_obj(Vector2 screenPos);
+    void select_obj(uintg obj);
+    float get_snap();
 
     DashEditor();
     ~DashEditor();
 };
+static Vector2 roundv(Vector2 v, float increment)
+{
+    return Vector2(roundf(v.x/increment)*increment, roundf(v.y/increment)*increment);
+}
+static float dir_to_angle(Vector2 dir)
+{
+    return atan2f(dir.x, dir.y);
+}
+float DashEditor::get_snap() { return snap ? 0.5f : 0.1f; }
+void DashEditor::select_obj(uintg obj)
+{
+    if (selectedObj != NO_OBJ)
+        objData[selectedObj].mat->set_uniform("u_color", objData[selectedObj].color);
+    selectedObj = obj;
+    if (obj != NO_OBJ)
+        objData[obj].mat->set_uniform("u_color", Vector4(0.5,0.75,1,1));
+}
 void DashEditor::set_state(ucharG state)
 {
     const Vector4 disabled = Vector4(0.75, 0.75, 0.75, 1);
     const Vector4 enabled = Vector4(1,1,1,1);
     panBtn->tint = disabled;
-    moveBtn->tint = disabled;
     trashBtn->tint = disabled;
 
     if (state == currentState)
         currentState = DashEditState::PAN;
     else currentState = state;
     
-    if (state == DashEditState::PAN) panBtn->tint = enabled;
-    else if (state == DashEditState::MOVE) moveBtn->tint = enabled;
-    else if (state == DashEditState::TRASH) trashBtn->tint = enabled;
+    if (currentState == DashEditState::PAN) panBtn->tint = enabled;
+    else if (currentState == DashEditState::TRASH) trashBtn->tint = enabled;
 }
 uintg DashEditor::find_obj(Vector2 screenPos)
 {
@@ -67,42 +89,50 @@ uintg DashEditor::find_obj(Vector2 screenPos)
         if (Math::within(pos.x, min.x, max.x) && Math::within(pos.y, min.y, max.y))
             return i;
     }
-    return ~0u;
+    return NO_OBJ;
 }
 void DashEditor::handle_touch(TouchData data)
 {
     if (currentState == DashEditState::PAN)
     {
-        Vector3 &camPos = Camera::main->position;
-        camPos -= data.delta * 10;
-        char buffer[16];
-        snprintf(buffer, 16, "%d, %d", (int)camPos.x, (int)camPos.y);
-        coordsText->str = buffer;
-        coordsText->refresh();
+        if (data.state == TouchState::PRESSED)
+        {
+            if (selectedObj != NO_OBJ)
+                select_obj(find_obj(data.pos));
+        }
+        if(data.state == TouchState::RELEASED)
+        {
+            if ((data.pos-data.startPos).sqr_magnitude() < 0.01*0.01)
+                select_obj(find_obj(data.pos));
+            else select_obj(NO_OBJ);
+            return;
+        }
+        if (selectedObj == NO_OBJ)
+        {
+            Vector3 &camPos = Camera::main->position;
+            camPos -= data.delta * 10;
+            char buffer[16];
+            snprintf(buffer, 16, "%d, %d", (int)camPos.x, (int)camPos.y);
+            coordsText->str = buffer;
+            coordsText->refresh();
+        }
+        else
+        {
+            Object2D *obj = objData[selectedObj].obj;
+            Vector2 pos = (Vector2)Camera::main->position + data.pos*Camera::main->orthoSize;
+            obj->position = roundv(pos, get_snap());
+        }
     }
     else if (currentState == DashEditState::TRASH)
     {
         if (data.state == TouchState::PRESSED)
         {
             uintg index = find_obj(data.pos);
-            if (index != ~0u)
+            if (index != NO_OBJ)
             {
+                select_obj(NO_OBJ);
                 Object2D::destroy(objData[index].obj);
                 objData.erase(objData.begin()+index);
-            }
-        }
-    }
-    else if (currentState == DashEditState::MOVE)
-    {
-        if (data.state == TouchState::PRESSED)
-        {
-            selectedObj = find_obj(data.pos);
-        }
-        else if (data.state == TouchState::MOVED)
-        {
-            if (selectedObj != ~0u)
-            {
-                objData[selectedObj].obj->position += data.delta*Camera::main->orthoSize;
             }
         }
     }
@@ -127,7 +157,7 @@ void DashEditor::save_finished(bool success)
         Animate::text(txt, 0.5, data);
     */
 }
-void DashEditor::save_game()
+void DashEditor::save_game(bool exitOnFinish)
 {
     if (saveDebounce)
         return;
@@ -135,45 +165,59 @@ void DashEditor::save_game()
     saveText->str = "Saving...";
     saveText->refresh();
 
-    std::ofstream out = std::ofstream(Assets::data_path()+"/level"+std::to_string(saveSlot), std::ios::binary);
-    if (!out)
+    if (objData.size() > 0)
     {
-        save_finished(0);
-        return;
+        std::ofstream out = std::ofstream(Assets::data_path()+"/level"+std::to_string(saveSlot), std::ios::binary);
+        if (!out)
+        {
+            save_finished(0);
+            return;
+        }
+        BinaryWriter writer;
+        for (auto &data : objData)
+        {
+            ucharG meshType;
+            ucharG colliderType;
+
+            if (data.obj->mesh == square.get())
+                meshType = MeshType::SQUARE, colliderType = ColliderType::AABB;
+            else if (data.obj->mesh == triangle.get())
+                meshType = MeshType::TRIANGLE, colliderType = ColliderType::TRIANGLE;
+            else throw("unsupported mesh");
+
+            writer.write<ucharG>(Header::OBJ2D);
+            writer.write<ucharG>(meshType);
+            writer.write<ucharG>(colliderType);
+            writer.write<Vector2>(data.obj->position);
+            writer.write<Vector2>(data.obj->scale);
+            writer.write<float>(data.obj->rotation);
+            writer.write<float>(data.obj->zIndex());
+        }
+        out << writer.get_buffer();
+        if (!out)
+        {
+            save_finished(0);
+            return;
+        }
     }
-    BinaryWriter writer;
-    for (auto &data : objData)
-    {
-        ucharG meshType;
-        ucharG colliderType;
-
-        if (data.obj->mesh == square.get())
-            meshType = MeshType::SQUARE, colliderType = ColliderType::AABB;
-        else if (data.obj->mesh == triangle.get())
-            meshType = MeshType::TRIANGLE, colliderType = ColliderType::TRIANGLE;
-        else throw("unsupported mesh");
-
-        writer.write<ucharG>(Header::OBJ2D);
-        writer.write<ucharG>(meshType);
-        writer.write<ucharG>(colliderType);
-        writer.write<Vector2>(data.obj->position);
-        writer.write<Vector2>(data.obj->scale);
-        writer.write<float>(data.obj->rotation);
-        writer.write<float>(data.obj->zIndex());
-    }
-
-    out << writer.get_buffer();
-    if (!out)
-    {
-        save_finished(0);
-        return;
-    }
-
-    Assets::sync_files(TYPE_LAMBDA(save_finished, bool));
+    if (exitOnFinish)
+        Assets::sync_files([this](bool success)
+        {
+            save_finished(success);
+            if (success)
+            {
+                Scene::destroy(Scene::activeScene);
+                Scene::create("Dash");
+            }
+        });
+    else Assets::sync_files(TYPE_LAMBDA(save_finished, bool));
 }
+#define TINT_ON_CLICK_D(img) TINT_ON_CLICK(img, (1,1,1,1), (0.75,0.75,0.75,1))
+
 DashEditor::DashEditor()
 {
-    Renderer::set_clear_color(0.2,0.2,0.3,1);
+    //Renderer::set_clear_color(0.2,0.2,0.3,1);
+    Camera::main->set_bg(0.2,0.2,0.3);
     Camera::main->orthoSize = 10;
     Camera::main->refresh();
     Camera::main->position.x = 7.5;
@@ -187,15 +231,12 @@ DashEditor::DashEditor()
 
     inputConn = Input::touch_changed().connect(TYPE_LAMBDA(handle_touch, TouchData));
 
-    UIImage *menuButton = UIImage::create(menuTex.get());
-    menuButton->anchor = Vector2(1, 1);
-    menuButton->scale = Vector2(0.15, 0.15);
-    menuButton->pos = Vector2(-0.25f, -menuButton->scale.y/2-0.02);
-    menuButton->onClick = []()
-    {
-        Scene::destroy(Scene::activeScene);
-        Scene::create("Dash");
-    };
+    UIImage *menuBtn = UIImage::create(menuTex.get());
+	TINT_ON_CLICK(menuBtn, (1,1,1,1), (0.75,0.75,0.75,1));
+    menuBtn->anchor = Vector2(1, 1);
+    menuBtn->scale = Vector2(0.15, 0.15);
+    menuBtn->pos = Vector2(-0.25f, -menuBtn->scale.y/2-0.02);
+    menuBtn->onClick = [this]() { save_game(1); };
 
     UIImage *saveBtn = UIImage::create();
     saveBtn->anchor = Vector2(-1, 1);
@@ -211,51 +252,60 @@ DashEditor::DashEditor()
     panBtn->onClick = [this]() { set_state(DashEditState::PAN); };
     text_for_img("Pan", panBtn);
 
-    moveBtn = UIImage::create();
-    moveBtn->anchor = Vector2(-1, -1);
-    moveBtn->scale = Vector2(0.35, 0.15);
-    moveBtn->pos = Vector2(0.175f, 0.075*3);
-    moveBtn->onClick = [this]() { set_state(DashEditState::MOVE); };
-    text_for_img("Move", moveBtn);
-
     trashBtn = UIImage::create();
     trashBtn->anchor = Vector2(-1, -1);
     trashBtn->scale = Vector2(0.35, 0.15);
-    trashBtn->pos = Vector2(0.175f, 0.075*5);
+    trashBtn->pos = Vector2(0.175f, 0.075*3);
     trashBtn->onClick = [this]() { set_state(DashEditState::TRASH); };
     text_for_img("Trash", trashBtn);
 
     set_state(DashEditState::PAN);
 
-    UIImage *cubeBtn = UIImage::create();
-    cubeBtn->anchor = Vector2(1, -1);
-    cubeBtn->scale = Vector2(0.35, 0.15);
-    cubeBtn->pos = Vector2(-0.175f, 0.075);
-    cubeBtn->onClick = [this]()
+    UIImage *squareBtn = UIImage::create();
+    squareBtn->anchor = Vector2(1, -1);
+    squareBtn->scale = Vector2(0.35, 0.15);
+    squareBtn->pos = Vector2(-0.175f, 0.075);
+    TINT_ON_CLICK_D(squareBtn);
+    squareBtn->onClick = [this]()
     {
-        Object2D *obj = Object2D::create(square.get(), spikeMat.get());
-        obj->position = Camera::main->position;
-        DashObjectData data;
-        data.obj = obj;
-        objData.push_back(data);
+        Object2D *obj = Object2D::create(square.get(), nullptr);
+        obj->position = roundv(Camera::main->position, get_snap());
+        EditorObjData &data = objData.emplace_back(obj, colShader.get());
+        data.color = Vector4(1,1,1,1);
+        data.mat->set_uniform("u_color", data.color);
+        obj->material = data.mat.get();
     };
-    text_for_img("New Square", cubeBtn);
+    text_for_img("New Square", squareBtn);
 
     UIImage *spikeBtn = UIImage::create();
     spikeBtn->anchor = Vector2(1, -1);
     spikeBtn->scale = Vector2(0.35, 0.15);
-    spikeBtn->pos = Vector2(-0.175f, 0.075*2);
+    spikeBtn->pos = Vector2(-0.175f, 0.075*3);
+    TINT_ON_CLICK_D(spikeBtn);
     spikeBtn->onClick = [this]()
     {
-        Object2D *obj = Object2D::create(triangle.get(), spikeMat.get());
-        obj->position = Camera::main->position;
-        DashObjectData data;
-        data.obj = obj;
-        objData.push_back(data);
+        Object2D *obj = Object2D::create(triangle.get(), nullptr);
+        obj->position = roundv(Camera::main->position, get_snap());
+        EditorObjData &data = objData.emplace_back(obj, colShader.get());
+        data.color = Vector4(1,1,1,1);
+        data.mat->set_uniform("u_color", data.color);
+        obj->material = data.mat.get();
+
     };
     text_for_img("New Spike", spikeBtn);
 
-    coordsText = UIText::create("0, 0");
+    UIImage *snapBtn = UIImage::create();
+    snapBtn->anchor = Vector2(1, -1);
+    snapBtn->scale = Vector2(0.35, 0.15);
+    snapBtn->pos = Vector2(-0.175f*3, 0.075);
+    snapBtn->onClick = [this]()
+    {
+        snap = !snap;
+        UIImage::get_held()->tint = snap ? Vector4(1,1,1,1) : Vector4(0.75,0.75,0.75,1);
+    };
+    text_for_img("Snap", snapBtn);
+
+    coordsText = UIText::create("7, 0");
     coordsText->anchor = Vector2(0, -1);
     coordsText->pivot = Vector2(0, 0);
     coordsText->pos = Vector2(0, 0);
@@ -263,11 +313,11 @@ DashEditor::DashEditor()
     coordsText->pos = Vector2(0, 0.05f);
 
 
-    otherMat = std::make_unique<Material>(colShader.get());
-    otherMat->set_uniform("u_color", Vector4(0.3,0.3,0.5,1));
-    Object2D *other = Object2D::create(square.get(), otherMat.get());
-    other->scale = Vector2(10000, 100);
-    other->position = Vector2(0, -1 - other->scale.y/2);
+    floorMat = std::make_unique<Material>(colShader.get());
+    floorMat->set_uniform("u_color", Vector4(0.3,0.3,0.5,1));
+    Object2D *floor = Object2D::create(square.get(), floorMat.get());
+    floor->scale = Vector2(10000, 100);
+    floor->position = Vector2(0, -1 - floor->scale.y/2);
 
     spikeMat = std::make_unique<Material>(colShader.get());
     spikeMat->set_uniform("u_color", Vector4(0.75,0.75,0.75,1));
@@ -292,19 +342,19 @@ DashEditor::DashEditor()
                 assert(reader);
 
                 Mesh *mesh=0;
-                Material *material=0;
-                if (meshType == MeshType::SQUARE) mesh=square.get(), material=spikeMat.get();
-                else if (meshType == MeshType::TRIANGLE) mesh = triangle.get(), material=spikeMat.get();
+                if (meshType == MeshType::SQUARE) mesh=square.get();
+                else if (meshType == MeshType::TRIANGLE) mesh = triangle.get();
                 else assert(false);
-                Object2D *obj = Object2D::create(mesh, material);
+                Object2D *obj = Object2D::create(mesh, nullptr);
                 obj->position = pos;
                 obj->scale = scale;
                 obj->rotation = rotation;
                 obj->zIndex(zIndex);
 
-                DashObjectData data;
-                data.obj = obj;
-                objData.push_back(data);
+                EditorObjData &data = objData.emplace_back(obj, colShader.get());
+                obj->material = data.mat.get();
+                data.color = Vector4(1,1,1,1);
+                data.mat->set_uniform("u_color", data.color);
             }
             else assert(false);
         }
@@ -315,7 +365,7 @@ DashEditor::~DashEditor()
     if (timerID != ~0u)
         Timer::cancel(timerID);
 
-    Renderer::set_clear_color(0,0,0,1);
+    //Renderer::set_clear_color(0,0,0,1);
     Camera::main->reset();
 }
 ADD_SCENE_COMPONENT("DashEditor", DashEditor);

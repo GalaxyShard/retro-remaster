@@ -267,12 +267,12 @@ NetTest::NetTest()
     //testEntity.add_comp(TransformECS(), *ECSManager::main);
 
 
-    UIImage *menuButton = new UIImage(menuTex.get());
-    menuButton->anchor = Vector2(1, 1);
-    menuButton->scale = Vector2(0.15, 0.15);
+    UIImage *menuBtn = new UIImage(menuTex.get());
+    menuBtn->anchor = Vector2(1, 1);
+    menuBtn->scale = Vector2(0.15, 0.15);
 
-    menuButton->pos = Vector2(-0.1f, -menuButton->scale.y/2-0.02);
-    menuButton->onClick = []()
+    menuBtn->pos = Vector2(-0.1f, -menuBtn->scale.y/2-0.02);
+    menuBtn->onClick = []()
     {
         delete thisScene;
         new Scene("Start");

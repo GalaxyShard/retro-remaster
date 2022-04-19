@@ -1,10 +1,6 @@
-#include <Galaxy/engine.hpp>
-namespace {
-
-struct Game
+#include <utils.hpp>
+struct Ping4
 {
-    Scene *scene;
-
     AssetRef<Mesh> square;
     std::unique_ptr<Material> ballMat, paddleMat, bgMat;
     AssetRef<Texture> menuTex, playTex, restartTex, bgTex;
@@ -15,27 +11,24 @@ struct Game
 
     UIImage *toggleGameBtn;
 
-    Object *ball;
-    Object *upPaddle, *downPaddle, *leftPaddle, *rightPaddle;
+    Object2D *ball;
+    Object2D *upPaddle, *downPaddle, *leftPaddle, *rightPaddle;
 
-    Object *lastCollision = 0, *secondLastCollision = 0;
+    Object2D *lastCollision = 0, *secondLastCollision = 0;
 
-    std::unique_ptr<Listener> preRenderConn;
-    std::unique_ptr<Listener> inputUpdateConn;
-    std::unique_ptr<ListenerT<TouchData>> touchInputConn;
+    Listener preRenderConn, inputUpdateConn;
+    ListenerT<TouchData> touchInputConn;
     Vector2 velocity;
 
     void clamp_paddles();
-    bool check_collision(Object *obj);
+    bool check_collision(Object2D *obj);
     void end_game();
     void pre_render();
     void input_update();
     void handle_touch(TouchData data);
-    Game();
-    ~Game();
+    Ping4();
+    ~Ping4();
 };
-//std::unique_ptr<Game> game;
-Game *game = nullptr;
 float remap(float value, float min, float max, float newMin, float newMax)
 {
     return (value-min)/(max-min)*(newMax-newMin)+newMin;
@@ -61,19 +54,18 @@ Vector2 random_unit()
     angle = angle * (Math::PI*2) - Math::PI;
     return Vector2(cos(angle), sin(angle));
 }
-void Game::end_game()
+void Ping4::end_game()
 {
-    preRenderConn->disconnect();
+    preRenderConn.disconnect();
 
-    UIImage *image = new UIImage();
+    UIImage *image = UIImage::create();
     image->anchor = Vector2();
     image->tint = Vector4(0.75,0.75,0.75,0.5);
     image->scale = Vector2(1, 0.3);
-    UIText *text = new UIText("Game over");
+    UIText *text = UIText::create("Game Over");
     text->scale = image->scale * 0.95f;
     text->anchor = Vector2();
     text->pivot = Vector2();
-
 }
 float get_dir(const char *bind0, const char *bind1)
 {
@@ -82,7 +74,7 @@ float get_dir(const char *bind0, const char *bind1)
     if (Input::is_held(bind1)) dir -= 1;
     return dir;
 }
-void Game::clamp_paddles()
+void Ping4::clamp_paddles()
 {
     float halfWidth = 0.3f * (0.5f);
     upPaddle->position.x = Math::clamp(upPaddle->position.x, -1+halfWidth, 1-halfWidth);
@@ -90,7 +82,7 @@ void Game::clamp_paddles()
     leftPaddle->position.y = Math::clamp(leftPaddle->position.y, -1+halfWidth, 1-halfWidth);
     rightPaddle->position.y = Math::clamp(rightPaddle->position.y, -1+halfWidth, 1-halfWidth);
 }
-bool Game::check_collision(Object *obj)
+bool Ping4::check_collision(Object2D *obj)
 {
     constexpr float minVel = 0.7f;
     constexpr int xAxis = 0, yAxis = 1;
@@ -107,7 +99,7 @@ bool Game::check_collision(Object *obj)
     // lastCollision prevents hitting it twice, and hitting after it goes past for 1 frame
     if (lastCollision != obj && -(ball->position[axis]*mul-ballRadius) >= -(obj->position[axis]+halfThickness)*mul)
     {
-        Object *prevLastCollision = lastCollision;
+        Object2D *prevLastCollision = lastCollision;
         lastCollision = obj;
         if (Math::within(ball->position[!axis], obj->position[!axis]-halfWidth-ballRadius, obj->position[!axis]+halfWidth+ballRadius))
         {
@@ -127,7 +119,7 @@ bool Game::check_collision(Object *obj)
             if (secondLastCollision != obj)
             {
                 score++;
-                scoreText->text = std::to_string(score);
+                scoreText->str = std::to_string(score);
                 scoreText->refresh();
             }
         }
@@ -136,7 +128,7 @@ bool Game::check_collision(Object *obj)
     }
     return 0;
 }
-void Game::pre_render()
+void Ping4::pre_render()
 {
     ball->position += velocity*Time::delta();
 
@@ -153,18 +145,18 @@ void Game::pre_render()
     if (check_collision(rightPaddle)) return;
     if (check_collision(leftPaddle)) return;
 }
-void Game::handle_touch(TouchData data)
+void Ping4::handle_touch(TouchData data)
 {
     if (data.state == TouchState::MOVED)
     {
-        Vector2 delta = data.delta * Renderer::aspectRatio * 1.25f;
+        Vector2 delta = data.delta * 1.25f;
         upPaddle->position.x += delta.x;
         downPaddle->position.x += delta.x;
         leftPaddle->position.y += delta.y;
         rightPaddle->position.y += delta.y;
     }
 }
-void Game::input_update()
+void Ping4::input_update()
 {
     float yDir = get_dir("up", "down")*Time::delta()*1.25f;
     float xDir = get_dir("right", "left")*Time::delta()*1.25f;
@@ -174,18 +166,19 @@ void Game::input_update()
     rightPaddle->position.y += yDir;
     clamp_paddles();
 }
-Game::Game()
+Ping4::Ping4()
 {
-    scene = Scene::activeScene;
+    Camera::main->orthoSize = 1;
+    Camera::main->refresh();
     Input::add_bind("up", Key::W);
     Input::add_bind("down", Key::S);
     Input::add_bind("left", Key::A);
     Input::add_bind("right", Key::D);
 
-    touchInputConn = Input::touch_changed().connect([](auto data) { game->handle_touch(data); });
-    inputUpdateConn = Renderer::pre_render().connect([]() { game->input_update(); });
+    touchInputConn = Input::touch_changed().connect(TYPE_LAMBDA(handle_touch, auto));
+    inputUpdateConn = Renderer::pre_render().connect(CLASS_LAMBDA(input_update));
     
-    square = Mesh::from_obj(Assets::gpath()+"/models/square.obj");
+    square = Mesh::load_obj(Assets::gpath()+"/models/square.obj");
 
     menuTex = Texture::load(Assets::path()+"/textures/menuButton.png", Texture::Pixel);
     playTex = Texture::load(Assets::path()+"/textures/continue.png", Texture::Pixel);
@@ -204,17 +197,17 @@ Game::Game()
     bgMat->mainTex = bgTex.get();
     bgMat->set_uniform("u_color", Vector4(1,1,1,0.2));
 
-    Object *bg = new Object(square.get(), bgMat.get());
-    bg->position.z = 1000;
+    Object2D *bg = Object2D::create(square.get(), bgMat.get());
+    bg->zIndex(-1000);
     bg->scale = Vector2(2,2);
 
-    upPaddle = new Object(square.get(), paddleMat.get());
-    downPaddle = new Object(square.get(), paddleMat.get());
-    leftPaddle = new Object(square.get(), paddleMat.get());
-    rightPaddle = new Object(square.get(), paddleMat.get());
+    upPaddle = Object2D::create(square.get(), paddleMat.get());
+    downPaddle = Object2D::create(square.get(), paddleMat.get());
+    leftPaddle = Object2D::create(square.get(), paddleMat.get());
+    rightPaddle = Object2D::create(square.get(), paddleMat.get());
 
-    ball = new Object(square.get(), ballMat.get());
-    ball->scale = Vector3(0.1,0.1);
+    ball = Object2D::create(square.get(), ballMat.get());
+    ball->scale = Vector2(0.1,0.1);
 
     upPaddle->scale = Vector2(0.3, 0.1);
     downPaddle->scale = Vector2(0.3, 0.1);
@@ -227,64 +220,51 @@ Game::Game()
     rightPaddle->position.x = 0.9;
 
 
-    UIImage *menuButton = new UIImage(menuTex.get());
-    menuButton->anchor = Vector2(1, 1);
-    menuButton->scale = Vector2(0.15, 0.15);
+    UIImage *menuBtn = UIImage::create(menuTex.get());
+	TINT_ON_CLICK(menuBtn, (1,1,1,1), (0.75,0.75,0.75,1));
+    menuBtn->anchor = Vector2(1, 1);
+    menuBtn->scale = Vector2(0.15, 0.15);
 
-    menuButton->pos = Vector2(-0.1f, -menuButton->scale.y/2-0.02);
-    menuButton->onClick = []()
+    menuBtn->pos = Vector2(-0.1f, -menuBtn->scale.y/2-0.02);
+    menuBtn->onClick = []()
     {
-        delete game;
-        game = nullptr;
-        new Scene("Start");
+        Scene::destroy(Scene::activeScene);
+        Scene::create("Start");
     };
-    toggleGameBtn = new UIImage(playTex.get());
+    toggleGameBtn = UIImage::create(playTex.get());
     toggleGameBtn->anchor = Vector2(1, 1);
     toggleGameBtn->scale = Vector2(0.15, 0.15);
 
     toggleGameBtn->pos = Vector2(-0.3f, -toggleGameBtn->scale.y/2-0.02);
-    toggleGameBtn->onClick = []()
+    toggleGameBtn->onClick = [this]()
     {
         static bool gameInProgress = 0;
         if (gameInProgress)
         {
-            delete game;
-            game = nullptr;
-            new Scene("Pong4");
+            Scene::destroy(Scene::activeScene);
+            Scene::create("Ping4");
         }
         else
         {
-            game->preRenderConn = Renderer::pre_render().connect([]() { game->pre_render(); });
-            game->toggleGameBtn->texture = game->restartTex.get();
-            game->velocity = random_unit();
+            preRenderConn = Renderer::pre_render().connect(CLASS_LAMBDA(pre_render));
+            toggleGameBtn->texture = restartTex.get();
+            velocity = random_unit();
         }
         gameInProgress = !gameInProgress;
     };
 
-    scoreText = new UIText("0");
+    scoreText = UIText::create("0");
     scoreText->anchor = Vector2(-1,1);
     scoreText->pivot = Vector2(0,0);
     scoreText->scale = Vector2(0.15, 0.15);
     scoreText->pos = Vector2(0.2f, -0.1f);
 }
-Game::~Game()
+Ping4::~Ping4()
 {
+    Camera::main->reset();
     Input::remove_bind("up");
     Input::remove_bind("down");
     Input::remove_bind("left");
     Input::remove_bind("right");
-    delete scene;
 }
-
-void first()
-{
-    //Scene::set_create_callback("Pong4", []() { game = std::make_unique<Game>(); });
-    Scene::set_create_callback("Pong4", []() { game = new Game(); });
-}
-FIRST_INIT_FUNC(first);
-//void clean()
-//{
-//    game = nullptr;
-//}
-//CLEANUP_FUNC(clean);
-}
+ADD_SCENE_COMPONENT("Ping4", Ping4);

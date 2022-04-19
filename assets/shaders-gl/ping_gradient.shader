@@ -8,7 +8,6 @@ out vec4 v_pos;
 void main()
 {
     gl_Position = u_mvp * pos;
-    //gl_Position = vec4(pos * u_scale + u_pos, 1);
     v_pos = gl_Position;
 }
 

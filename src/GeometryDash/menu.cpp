@@ -4,51 +4,52 @@
 struct DashMenu
 {
     AssetRef<Texture> menuTex;
-    uintg selectedLevel = 0;
+    DashSceneData *data;
     UIText *selectedText;
 
     DashMenu();
     ~DashMenu();
 };
+#define TINT_ON_CLICK_D(img) TINT_ON_CLICK(img, (0.2,0.2,0.2,1), (0.15,0.15,0.15,1))
+
 DashMenu::DashMenu()
 {
+    globalScene->add_component<DashSceneData>();
+    data = globalScene->get_component<DashSceneData>();
+
     menuTex = Texture::load(Assets::path()+"/textures/menuButton.png", Texture::Pixel);
     
-    UIImage *menuButton = UIImage::create(menuTex.get());
-    menuButton->anchor = Vector2(1, 1);
-    menuButton->scale = Vector2(0.15, 0.15);
-    menuButton->pos = Vector2(-0.25f, -menuButton->scale.y/2-0.02);
-    menuButton->onClick = []()
+    UIImage *menuBtn = UIImage::create(menuTex.get());
+	TINT_ON_CLICK(menuBtn, (1,1,1,1), (0.75,0.75,0.75,1));
+    menuBtn->anchor = Vector2(1, 1);
+    menuBtn->scale = Vector2(0.15, 0.15);
+    menuBtn->pos = Vector2(-0.25f, -menuBtn->scale.y/2-0.02);
+    menuBtn->onClick = []()
     {
         Scene::destroy(Scene::activeScene);
         Scene::create("Start");
+        globalScene->remove_component<DashSceneData>();
     };
 
     UIImage *startBtn = UIImage::create();
-    startBtn->tint = Vector4(0.2,0.2,0.2,1);
+    TINT_ON_CLICK_D(startBtn);
     startBtn->anchor = Vector2(0,0);
     startBtn->scale = Vector2(1, 0.25);
-    startBtn->onClick = [this]()
+    startBtn->onClick = []()
     {
         Scene::destroy(Scene::activeScene);
-        globalScene->add_component<DashSceneData>();
-        auto *data = globalScene->get_component<DashSceneData>();
-        data->level = selectedLevel;
         Scene::create("DashLevel");
     };
     UIText *startText = text_for_img("Start!", startBtn);
 
     UIImage *editorBtn = UIImage::create();
-    editorBtn->tint = Vector4(0.2,0.2,0.2,1);
+    TINT_ON_CLICK_D(editorBtn);
     editorBtn->anchor = Vector2(0,0);
     editorBtn->scale = Vector2(1, 0.25);
     editorBtn->pos = Vector2(0, -0.3);
-    editorBtn->onClick = [this]()
+    editorBtn->onClick = []()
     {
         Scene::destroy(Scene::activeScene);
-        globalScene->add_component<DashSceneData>();
-        auto *data = globalScene->get_component<DashSceneData>();
-        data->level = selectedLevel;
         Scene::create("DashEditor");
     };
     UIText *editorText = text_for_img("Edit!", editorBtn);
@@ -60,11 +61,13 @@ DashMenu::DashMenu()
     decreaseBtn->rotation = Math::PI*0.5f;
     decreaseBtn->onTouchDown = [this]()
     {
-        if (selectedLevel != 0)
-            selectedLevel -= 1;
-        selectedText->str = std::to_string(selectedLevel);
+        UIImage::get_held()->tint = Vector4(0.75,0.75,0.75, 1);
+        if (data->level != 0)
+            data->level -= 1;
+        selectedText->str = std::to_string(data->level);
         selectedText->refresh();
     };
+    decreaseBtn->onTouchUp = [](){ UIImage::get_held()->tint = Vector4(1,1,1,1); };
     UIImage *increaseBtn = UIImage::create(menuTex.get());
     increaseBtn->anchor = Vector2(0,0);
     increaseBtn->scale = Vector2(0.25, 0.25);
@@ -72,14 +75,13 @@ DashMenu::DashMenu()
     increaseBtn->rotation = -Math::PI*0.5f;
     increaseBtn->onTouchDown = [this]()
     {
-        selectedLevel += 1;
-        selectedText->str = std::to_string(selectedLevel);
+        UIImage::get_held()->tint = Vector4(0.75,0.75,0.75, 1);
+        data->level += 1;
+        selectedText->str = std::to_string(data->level);
         selectedText->refresh();
     };
-    auto *sceneData = globalScene->get_component<DashSceneData>();
-    if (sceneData)
-        selectedLevel = sceneData->level;
-    selectedText = UIText::create(std::to_string(selectedLevel));
+    increaseBtn->onTouchUp = [](){ UIImage::get_held()->tint = Vector4(1,1,1,1); };
+    selectedText = UIText::create(std::to_string(data->level));
     selectedText->anchor = Vector2(0,0);
     selectedText->scale = Vector2(0.25, 0.25);
     selectedText->pos = Vector2(0, -0.6);

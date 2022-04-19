@@ -1,5 +1,6 @@
 #include <utils.hpp>
 #include <global.hpp>
+#include <GeometryDash/dash.hpp>
 
 const char *gameName = "Retro Collection";
 Scene *globalScene;
@@ -17,10 +18,11 @@ struct StartScene
     StartScene();
     ~StartScene();
 };
+#define TINT_ON_CLICK_D(img) TINT_ON_CLICK(img, (0.6,0.6,0.6,1), (0.5,0.5,0.5,1))
 
 void StartScene::init_menu(std::string name, std::string sceneName, std::string tutorial)
 {
-    sceneToOpen = name;
+    sceneToOpen = sceneName;
     UIImage *background = UIImage::create();
     background->anchor = Vector2(0,0);
     background->scale = Vector2(1.5, 1);
@@ -33,10 +35,10 @@ void StartScene::init_menu(std::string name, std::string sceneName, std::string 
     title->pos = Vector2(0.1, 0.4);
 
     UIImage *exitBtn = UIImage::create();
-    exitBtn->tint = Vector4(1,0,0,1);
     exitBtn->anchor = Vector2(0,0);
     exitBtn->scale = Vector2(0.25,0.25);
-    exitBtn->pos = Vector2(-0.75,0.5) + exitBtn->scale/2*Vector2(1,-1);
+    exitBtn->pos = Vector2(-0.75,0.5) + exitBtn->scale/2.f*Vector2(1,-1);
+    TINT_ON_CLICK(exitBtn, (1,0,0,1), (0.75,0,0,1));
 
     exitBtn->onClick = []()
     {
@@ -45,16 +47,17 @@ void StartScene::init_menu(std::string name, std::string sceneName, std::string 
     };
 
     UIImage *playBtn = UIImage::create();
-    playBtn->tint = Vector4(0.9,0.9,0.9,1);
     playBtn->anchor = Vector2(0,0);
     playBtn->scale = Vector2(0.5,0.25);
-    playBtn->pos = Vector2(0.75,-0.5) + playBtn->scale/2*Vector2(-1,1);
+    playBtn->pos = Vector2(0.75,-0.5) + playBtn->scale/2.f*Vector2(-1,1);
+    TINT_ON_CLICK(playBtn, (0.9,0.9,0.9,1), (0.8,0.8,0.8,1));
     
     text_for_img("Play", playBtn);
 
     playBtn->onClick = [this](){
-        Scene::create(sceneToOpen);
+        std::string open = sceneToOpen;
         Scene::destroy(scene);
+        Scene::create(open);
     };
 }
 
@@ -73,12 +76,10 @@ StartScene::StartScene()
 
     Vector2 gameSize = Vector2(0.5, 0.25);
 
-    const Vector4 buttonColor = Vector4(0.6,0.6,0.6,1);
-
     UIImage *minesweeperBtn = UIImage::create();
-    minesweeperBtn->tint = buttonColor;
+    TINT_ON_CLICK_D(minesweeperBtn);
     minesweeperBtn->scale = gameSize;
-    minesweeperBtn->pos = Vector2(0.1,0.1) + minesweeperBtn->scale/2;
+    minesweeperBtn->pos = Vector2(0.1,0.1) + minesweeperBtn->scale/2.f;
     UIText *minesweeperText = text_for_img("Minesweeper", minesweeperBtn);
     minesweeperText->scale.y *= 0.5f;
     minesweeperBtn->onClick = [this](){
@@ -90,7 +91,7 @@ StartScene::StartScene()
         );
     };
     UIImage *snakeBtn = UIImage::create();
-    snakeBtn->tint = buttonColor;
+    TINT_ON_CLICK_D(snakeBtn);
     snakeBtn->anchor = Vector2(0,-1);
     snakeBtn->scale = gameSize;
     snakeBtn->pos = Vector2(0, 0.1 + snakeBtn->scale.y/2);
@@ -104,14 +105,14 @@ StartScene::StartScene()
         );
     };
     UIImage *pong4Btn = UIImage::create();
-    pong4Btn->tint = buttonColor;
+    TINT_ON_CLICK_D(pong4Btn);
     pong4Btn->anchor = Vector2(1,-1);
     pong4Btn->scale = gameSize;
     pong4Btn->pos = Vector2(-0.1-pong4Btn->scale.x/2, 0.1+pong4Btn->scale.y/2);
     UIText *pong4Text = text_for_img("Ping 4", pong4Btn);
     pong4Text->scale.y *= 0.5f;
     pong4Btn->onClick = [this](){
-        init_menu("Ping 4", "Pong4",
+        init_menu("Ping 4", "Ping4",
             "A singleplayer retro-style version of table tennis.\n"
             "The goal is to keep the ball in play for as long as possible. Hitting the ball gives one point. Losing the ball restarts the game\n"
             "Swipe or use WASD to move the paddles"
@@ -119,7 +120,7 @@ StartScene::StartScene()
     };
 
     UIImage *dashBtn = UIImage::create();
-    dashBtn->tint = buttonColor;
+    TINT_ON_CLICK_D(dashBtn);
     dashBtn->anchor = Vector2(-1,-1);
     dashBtn->scale = gameSize;
     dashBtn->pos = Vector2(0.1+dashBtn->scale.x/2, 0.15+dashBtn->scale.y/2+dashBtn->scale.y);
@@ -130,7 +131,7 @@ StartScene::StartScene()
     };
 
     UIImage *testBtn = UIImage::create();
-    testBtn->tint = buttonColor;
+    TINT_ON_CLICK_D(testBtn);
     testBtn->anchor = Vector2(0,-1);
     testBtn->scale = gameSize;
     testBtn->pos = Vector2(0, 0.15+testBtn->scale.y/2+testBtn->scale.y);
@@ -139,11 +140,13 @@ StartScene::StartScene()
     testBtn->onClick = [this](){
         init_menu("Test", "NetTest", "");
     };
-    Renderer::set_clear_color(0.75,0.75,0.75,1);
+    //Renderer::set_clear_color(0.75,0.75,0.75,1);
+    Camera::main->set_bg(0.75, 0.75, 0.75);
 }
 StartScene::~StartScene()
 {
-    Renderer::set_clear_color(0,0,0,1);
+    Camera::main->reset();
+    //Renderer::set_clear_color(0,0,0,1);
 }
 struct FPSCounter
 {
@@ -204,7 +207,7 @@ static void init()
             writer.write<ucharG>(Header::OBJ2D);
             writer.write<ucharG>(isSpike ? MeshType::TRIANGLE : MeshType::SQUARE);
             writer.write<ucharG>(isSpike ? ColliderType::TRIANGLE : ColliderType::AABB);
-            writer.write<Vector2>(Vector2(14.25*i+2+j, -0.5));
+            writer.write<Vector2>(Vector2(roundf((14.25*i+2+j)/0.1)*0.1, -0.5));
             writer.write<Vector2>(Vector2(1,1));
             writer.write<float>(0);
             writer.write<float>(0);
@@ -215,6 +218,7 @@ static void init()
     output << writer.get_buffer();
     if (!output) return;
     Assets::sync_files();
+
 
 }
 INIT_FUNC(init);

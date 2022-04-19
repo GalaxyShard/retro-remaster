@@ -255,11 +255,11 @@ Minesweeper::Minesweeper()
     continueTex = Texture::load(Assets::path()+"/textures/continue.png", Texture::Pixel);
     menuTex = Texture::load(Assets::path()+"/textures/menuButton.png", Texture::Pixel);
 
-    //UIImage *nav = UIImage::create();
-    //nav->tint = Vector4(0.1, 0.1, 0.1, 1);
-    //nav->group = UIGroup::safeArea;
-    //nav->pos = Vector2(0, 1);
-    //nav->scale = Vector2(2, 0.5f);
+    UIImage *nav = UIImage::create();
+    nav->tint = Vector4(0.2, 0.2, 0.2, 1);
+    nav->anchor = Vector2(0, 1);
+    nav->scale = Vector2(20, 0.18f);
+    nav->pos = Vector2(0, -nav->scale.y*0.5f);
 
     timer = UIText::create("00:00");
     timer->anchor = Vector2(1, 1);
@@ -312,11 +312,12 @@ Minesweeper::Minesweeper()
     continueBtn->pos = Vector2(-0.5f, -continueBtn->scale.y/2-0.02);
     continueBtn->onClick = CLASS_LAMBDA(continue_game);
 
-    UIImage *menuButton = UIImage::create(menuTex.get());
-    menuButton->anchor = Vector2(1, 1);
-    menuButton->scale = Vector2(0.15, 0.15);
-    menuButton->pos = Vector2(-0.7f, -menuButton->scale.y/2-0.02);
-    menuButton->onClick = []()
+    UIImage *menuBtn = UIImage::create(menuTex.get());
+	TINT_ON_CLICK(menuBtn, (1,1,1,1), (0.75,0.75,0.75,1));
+    menuBtn->anchor = Vector2(1, 1);
+    menuBtn->scale = Vector2(0.15, 0.15);
+    menuBtn->pos = Vector2(-0.7f, -menuBtn->scale.y/2-0.02);
+    menuBtn->onClick = []()
     {
         Scene::destroy(Scene::activeScene);
         Scene::create("Start");
