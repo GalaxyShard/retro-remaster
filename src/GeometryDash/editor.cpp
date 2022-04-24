@@ -13,6 +13,18 @@ struct EditorObjData
 };
 struct DashEditState { enum : ucharG { PAN,TRASH }; };
 
+struct UIElement
+{
+    void *data;
+    enum {UIIMAGE,UITEXT} type;
+    UIElement(UIImage *img) : data(img), type(UIIMAGE){}
+    UIElement(UIText *txt) : data(txt), type(UITEXT){}
+};
+struct DashEditorMenu
+{
+    UIGroup *group;
+    std::vector<UIElement> ui;
+};
 struct DashEditor
 {
     AssetRef<Texture> menuTex;
@@ -27,12 +39,15 @@ struct DashEditor
     UIImage *trashBtn, *panBtn;
     UIText *coordsText, *saveText;
 
+    DashEditorMenu *colorEditor = 0;
+
     uintg selectedObj = NO_OBJ;
     uintg saveSlot = 0;
     uintg timerID = ~0u;
     ucharG currentState = DashEditState::PAN;
     bool saveDebounce = 0;
     bool snap = 1;
+
 
     void handle_touch(TouchData data);
     void save_finished(bool success);
@@ -97,14 +112,15 @@ void DashEditor::handle_touch(TouchData data)
     {
         if (data.state == TouchState::PRESSED)
         {
-            if (selectedObj != NO_OBJ)
-                select_obj(find_obj(data.pos));
+            if (find_obj(data.pos) != selectedObj)
+                select_obj(NO_OBJ);
         }
         if(data.state == TouchState::RELEASED)
         {
             if ((data.pos-data.startPos).sqr_magnitude() < 0.01*0.01)
                 select_obj(find_obj(data.pos));
-            else select_obj(NO_OBJ);
+            else if (find_obj(data.pos) != selectedObj)
+                select_obj(NO_OBJ);
             return;
         }
         if (selectedObj == NO_OBJ)
@@ -165,33 +181,35 @@ void DashEditor::save_game(bool exitOnFinish)
     saveText->str = "Saving...";
     saveText->refresh();
 
-    if (objData.size() > 0)
+    std::string path = Assets::data_path()+"/level"+std::to_string(saveSlot);
+    if (objData.size() == 0)
+        remove(path.c_str());
+    else
     {
-        std::ofstream out = std::ofstream(Assets::data_path()+"/level"+std::to_string(saveSlot), std::ios::binary);
+        std::ofstream out = std::ofstream(path, std::ios::binary);
         if (!out)
         {
             save_finished(0);
             return;
         }
         BinaryWriter writer;
+        writer.write<shortg>(0);
         for (auto &data : objData)
         {
             ucharG meshType;
-            ucharG colliderType;
 
             if (data.obj->mesh == square.get())
-                meshType = MeshType::SQUARE, colliderType = ColliderType::AABB;
+                meshType = MeshType::SQUARE;
             else if (data.obj->mesh == triangle.get())
-                meshType = MeshType::TRIANGLE, colliderType = ColliderType::TRIANGLE;
+                meshType = MeshType::TRIANGLE;
             else throw("unsupported mesh");
 
-            writer.write<ucharG>(Header::OBJ2D);
             writer.write<ucharG>(meshType);
-            writer.write<ucharG>(colliderType);
             writer.write<Vector2>(data.obj->position);
             writer.write<Vector2>(data.obj->scale);
             writer.write<float>(data.obj->rotation);
             writer.write<float>(data.obj->zIndex());
+            writer.write<Vector3>(data.color);
         }
         out << writer.get_buffer();
         if (!out)
@@ -216,7 +234,6 @@ void DashEditor::save_game(bool exitOnFinish)
 
 DashEditor::DashEditor()
 {
-    //Renderer::set_clear_color(0.2,0.2,0.3,1);
     Camera::main->set_bg(0.2,0.2,0.3);
     Camera::main->orthoSize = 10;
     Camera::main->refresh();
@@ -326,37 +343,51 @@ DashEditor::DashEditor()
     BinaryFileReader reader = BinaryFileReader(Assets::data_path()+"/level"+std::to_string(saveSlot));
     if (reader)
     {
+        bool errored = 0;
+        shortg version = reader.read<shortg>();
+        if (version != 0)
+        {
+            logmsg("Invalid version\n");
+            return;
+        }
+
         while(1)
         {
-            ucharG header = reader.read<ucharG>();
+            ucharG meshType = reader.read<ucharG>();
             if (!reader)
                 break;
-            if (header == Header::OBJ2D)
+            Vector2 pos = reader.read<Vector2>();
+            Vector2 scale = reader.read<Vector2>();
+            float rotation = reader.read<float>();
+            float zIndex = reader.read<float>();
+            Vector3 col = reader.read<Vector3>();
+            if (!reader)
             {
-                ucharG meshType = reader.read<ucharG>();
-                ucharG colliderType = reader.read<ucharG>();
-                Vector2 pos = reader.read<Vector2>();
-                Vector2 scale = reader.read<Vector2>();
-                float rotation = reader.read<float>();
-                float zIndex = reader.read<float>();
-                assert(reader);
-
-                Mesh *mesh=0;
-                if (meshType == MeshType::SQUARE) mesh=square.get();
-                else if (meshType == MeshType::TRIANGLE) mesh = triangle.get();
-                else assert(false);
-                Object2D *obj = Object2D::create(mesh, nullptr);
-                obj->position = pos;
-                obj->scale = scale;
-                obj->rotation = rotation;
-                obj->zIndex(zIndex);
-
-                EditorObjData &data = objData.emplace_back(obj, colShader.get());
-                obj->material = data.mat.get();
-                data.color = Vector4(1,1,1,1);
-                data.mat->set_uniform("u_color", data.color);
+                errored = 1;
+                break;
             }
-            else assert(false);
+
+            Mesh *mesh=0;
+            if (meshType == MeshType::SQUARE) mesh=square.get();
+            else if (meshType == MeshType::TRIANGLE) mesh = triangle.get();
+            else { errored=1; break; }
+            Object2D *obj = Object2D::create(mesh, nullptr);
+            obj->position = pos;
+            obj->scale = scale;
+            obj->rotation = rotation;
+            obj->zIndex(zIndex);
+
+            EditorObjData &data = objData.emplace_back(obj, colShader.get());
+            obj->material = data.mat.get();
+            data.color = Vector4(col.x,col.y,col.z,1);
+            data.mat->set_uniform("u_color", data.color);
+        }
+        if (errored)
+        {
+            logmsg("Error reading\n");
+            for (auto &d : objData)
+                Object2D::destroy(d.obj);
+            objData.clear();
         }
     }
 }
@@ -364,8 +395,6 @@ DashEditor::~DashEditor()
 {
     if (timerID != ~0u)
         Timer::cancel(timerID);
-
-    //Renderer::set_clear_color(0,0,0,1);
     Camera::main->reset();
 }
 ADD_SCENE_COMPONENT("DashEditor", DashEditor);

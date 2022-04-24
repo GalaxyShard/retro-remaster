@@ -23,21 +23,32 @@ struct StartScene
 void StartScene::init_menu(std::string name, std::string sceneName, std::string tutorial)
 {
     sceneToOpen = sceneName;
+    
+    UIGroup *group = UIGroup::create();
+    group->scale = Vector2(0.75, 0.5);
+    //group->parent(UIGroup::aspectRatio);
+    group->cache();
+    
+    
     UIImage *background = UIImage::create();
+    background->group = group;
     background->anchor = Vector2(0,0);
-    background->scale = Vector2(1.5, 1);
+    background->scaleToFit = 1;
+    background->scale = Vector2(2,2);
     background->tint = Vector4(0.6,0.6,0.6,1);
 
     UIText *title = UIText::create(name);
-    title->anchor = Vector2(0,0);
-    title->scale = Vector2(1, 0.25);
+    title->group = group;
+    title->anchor = Vector2(0,1);
+    title->scale = Vector2(1.5, 0.5);
     title->pivot = Vector2(0, 0);
-    title->pos = Vector2(0.1, 0.4);
+    title->pos = Vector2(0.25, -0.25);
 
     UIImage *exitBtn = UIImage::create();
-    exitBtn->anchor = Vector2(0,0);
-    exitBtn->scale = Vector2(0.25,0.25);
-    exitBtn->pos = Vector2(-0.75,0.5) + exitBtn->scale/2.f*Vector2(1,-1);
+    exitBtn->group = group;
+    exitBtn->anchor = Vector2(-1,1);
+    exitBtn->scale = Vector2(0.5,0.5);
+    exitBtn->pos = Vector2(0.25, -0.25);
     TINT_ON_CLICK(exitBtn, (1,0,0,1), (0.75,0,0,1));
 
     exitBtn->onClick = []()
@@ -47,9 +58,10 @@ void StartScene::init_menu(std::string name, std::string sceneName, std::string 
     };
 
     UIImage *playBtn = UIImage::create();
-    playBtn->anchor = Vector2(0,0);
-    playBtn->scale = Vector2(0.5,0.25);
-    playBtn->pos = Vector2(0.75,-0.5) + playBtn->scale/2.f*Vector2(-1,1);
+    playBtn->group = group;
+    playBtn->anchor = Vector2(1,-1);
+    playBtn->scale = Vector2(1,0.5);
+    playBtn->pos = Vector2(-0.5, 0.25);
     TINT_ON_CLICK(playBtn, (0.9,0.9,0.9,1), (0.8,0.8,0.8,1));
     
     text_for_img("Play", playBtn);
@@ -66,13 +78,18 @@ StartScene::StartScene()
     scene = Scene::activeScene;
     UIImage *topBar = UIImage::create();
     topBar->anchor = Vector2(0, 1);
-    topBar->scale = Vector2(20, 0.35);
+    topBar->scale = Vector2(2, 0.35);
     topBar->tint = Vector4(0.85,0.85,0.85,1);
+    topBar->scaleToFit = 1;
     UIText *title = UIText::create("Retro Collection");
     title->anchor = Vector2(0, 1);
-    title->pivot = Vector2(0, 1);
-    title->scale = Vector2(1,1);
+    title->pivot = Vector2(0,1);
+    title->scale = Vector2(2,0.35/2);
+    //img_for_text(title);
     title->pos.y = -title->scale.y/2;
+
+    //logmsg("(%.3o), (%.3o)\n", (Vector2)title->get_mesh()->aabbMin, (Vector2)title->get_mesh()->aabbMax);
+    //Mesh::export_obj(title->get_mesh(), Assets::data_path()+"/text.obj");
 
     Vector2 gameSize = Vector2(0.5, 0.25);
 
@@ -140,13 +157,11 @@ StartScene::StartScene()
     testBtn->onClick = [this](){
         init_menu("Test", "NetTest", "");
     };
-    //Renderer::set_clear_color(0.75,0.75,0.75,1);
     Camera::main->set_bg(0.75, 0.75, 0.75);
 }
 StartScene::~StartScene()
 {
     Camera::main->reset();
-    //Renderer::set_clear_color(0,0,0,1);
 }
 struct FPSCounter
 {
@@ -198,19 +213,23 @@ static void init()
     Scene::create("Start");
     
     BinaryWriter writer;
+    writer.write<shortg>(0); // version
     for (uintg i = 1; i <= 2000; ++i)
     {
         uintg numSpikes = rand()%3+1;
         for (uintg j = 0; j < numSpikes; ++j)
         {
             bool isSpike = (rand()%2==0);
-            writer.write<ucharG>(Header::OBJ2D);
-            writer.write<ucharG>(isSpike ? MeshType::TRIANGLE : MeshType::SQUARE);
-            writer.write<ucharG>(isSpike ? ColliderType::TRIANGLE : ColliderType::AABB);
-            writer.write<Vector2>(Vector2(roundf((14.25*i+2+j)/0.1)*0.1, -0.5));
-            writer.write<Vector2>(Vector2(1,1));
-            writer.write<float>(0);
-            writer.write<float>(0);
+            writer.write<ucharG>(isSpike ? MeshType::TRIANGLE : MeshType::SQUARE); // mesh
+            writer.write<Vector2>(Vector2(roundf((14.25*i+2+j)/0.1)*0.1, -0.5)); // pos
+            writer.write<Vector2>(Vector2(1,1)); // scale
+            writer.write<float>(0); // rotation
+            writer.write<float>(0); // z
+            writer.write<Vector3>(Vector3(
+                rand()/(float)RAND_MAX,
+                rand()/(float)RAND_MAX,
+                rand()/(float)RAND_MAX
+            )); // color
         }
     }
     std::ofstream output = std::ofstream(Assets::data_path()+"/level0", std::ios::binary);
@@ -218,8 +237,6 @@ static void init()
     output << writer.get_buffer();
     if (!output) return;
     Assets::sync_files();
-
-
 }
 INIT_FUNC(init);
 ADD_SCENE_COMPONENT("Start", StartScene);

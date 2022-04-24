@@ -29,10 +29,6 @@ struct Ping4
     Ping4();
     ~Ping4();
 };
-float remap(float value, float min, float max, float newMin, float newMax)
-{
-    return (value-min)/(max-min)*(newMax-newMin)+newMin;
-}
 Vector2 random_unit()
 {
 /*
@@ -108,8 +104,8 @@ bool Ping4::check_collision(Object2D *obj)
             float maxValue = (halfWidth+ballRadius);
             
             // Reverse velocity
-            if (velocity[!axis] > 0) velocity[!axis] = remap(velocity[!axis], 0, maxValue, maxValue, 0);
-            else velocity[!axis] = remap(velocity[!axis], -maxValue, 0, 0, -maxValue);
+            if (velocity[!axis] > 0) velocity[!axis] = Math::remap(velocity[!axis], 0, maxValue, maxValue, 0);
+            else velocity[!axis] = Math::remap(velocity[!axis], -maxValue, 0, 0, -maxValue);
 
             velocity[!axis] *= 7;
 

@@ -21,7 +21,9 @@ struct Minesweeper
     uintg revealCount = 0;
     Tile *map = 0;
 
-    Listener renderConn;
+    UIGroup *group;
+
+    Listener renderConn, aspectConn;
     UIText *timer, *flagsText;
 
     UIText *endText = 0;
@@ -43,6 +45,7 @@ struct Minesweeper
     void reveal_tile(int x, int y);
     void on_click();
     void pre_render();
+    void fix_board();
 };
 std::string filter_time(int t)
 { return t < 10 ? "0"+std::to_string(t) : std::to_string(t); }
@@ -51,6 +54,19 @@ std::string hms(int t)
     int seconds = t % 60;
     int minutes = t / 60;
     return filter_time(minutes)+":"+filter_time(seconds);
+}
+void Minesweeper::fix_board()
+{
+    Vector2 min,max;
+    Vector2 ratio = Renderer::aspectRatio;
+    //float size = std::max(Renderer::aspectRatio.x, Renderer::aspectRatio.y);
+    // 16:9 == 1.77
+    if (ratio.x > 1.7f || ratio.y > 1.25f) min = Vector2(-1,-1), max = Vector2(1,1);
+    else min = Vector2(-0.9,-1), max = Vector2(0.9,0.8);
+
+    group->pos = (min+max)/2;
+    group->scale = (max-min)/2;
+    group->cache();
 }
 void Minesweeper::clear_board()
 {
@@ -325,16 +341,26 @@ Minesweeper::Minesweeper()
 
 
     map = new Tile[tiles];
-    // possibly use UIGroup instead of equation for flexability
-#if OS_MOBILE
-    Vector2 min = Vector2(-1,-1), max = Vector2(1,1);
-#else
-    Vector2 min = Vector2(-0.9,-1), max = Vector2(0.9,0.8);
-#endif
+//#if OS_MOBILE
+//    Vector2 min = Vector2(-1,-1), max = Vector2(1,1);
+//#else
+//    Vector2 min = Vector2(-0.9,-1), max = Vector2(0.9,0.8);
+//#endif
+    
+    group = UIGroup::create();
+    //group->pos = (min+max)/2;
+    //group->scale = (max-min)/2;
+    group->parent(UIGroup::aspectRatio);
+    group->anchor = Vector2(0,0);
+    //group->cache();
+    fix_board();
+    aspectConn = Renderer::aspect_ratio_changed().connect(CLASS_LAMBDA(fix_board));
+
     Vector2 mapSize = Vector2(mapWidth, mapHeight);
-    Vector2 imgSize = (max-min) / mapSize;
+    Vector2 imgSize = Vector2(2,2) / mapSize;
+    //Vector2 imgSize = (max-min) / mapSize;
     {
-        float minSize = Math::min(imgSize.x, imgSize.y);
+        float minSize = std::min(imgSize.x, imgSize.y);
         imgSize = Vector2(minSize, minSize);
     }
     for (unsigned int i = 0; i < tiles; ++i)
@@ -342,10 +368,12 @@ Minesweeper::Minesweeper()
         Vector2Int tile = Vector2Int(i % mapWidth, i / mapWidth);
         UIImage *img = UIImage::create(tileTex.get());
         map[i].img = img;
-        img->group = UIGroup::aspectRatio;
+        img->group = group;
+        //img->group = UIGroup::aspectRatio;
 
         img->scale = imgSize;
-        img->pos = imgSize*tile + img->scale/2 + (Vector2(1,1)+min);
+        img->pos = imgSize*tile + img->scale*0.5f;
+        //img->pos = imgSize*tile + img->scale/2 + (Vector2(1,1)+min);
 
         imgToTile[img] = i;
         img->onClick = CLASS_LAMBDA(on_click);

@@ -33,23 +33,28 @@ struct DashLevel
 {
     Listener renderConn;
     ListenerT<TouchData> inputConn;
-    AssetRef<Texture> menuTex;
+    AssetRef<Texture> menuTex, bgTex;
     AssetRef<Shader> colShader, tintShader;
     AssetRef<Mesh> square, triangle;
 
     std::unique_ptr<AudioPlayer> bgAudio;
-    std::unique_ptr<Material> playerMat, floorMat, spikeMat;
+    std::unique_ptr<Material> playerMat, floorMat, spikeMat, bgMat;
 
     UIText *coordsText;
 
     std::vector<DashCollider> colliders;
     std::vector<DashObjData> objData;
-    Object2D *player;
+    Object2D *player, *bg;
 
 
-    float gravity = -60.f;
+    // slow  8.382
+    // 1x    10.386
+    // 2x    12.914
+    // 3x    15.6
+    // 4x    19.2
+    float speed = 10.386f;
+    float gravity = -80.f;
     float jumpHeight = 2;
-    float speed = 10.37f;
     Vector3 vel;
 
     bool jump=0, gameEnded=0, isGrounded=1;
@@ -123,7 +128,8 @@ void DashLevel::pre_render()
             tempPlayer[i] = player->position + playerPoints[i];
         
         DashCollisionData mainHitbox = test_collision(tempPlayer, &collider);
-        player->position += mainHitbox.mtv;
+        if (mainHitbox.mtv.y > 0)
+            player->position.y += mainHitbox.mtv.y;
 
         for (uintg i = 0; i < 4; ++i)
             tempPlayer[i].y -= 0.05f;
@@ -133,7 +139,12 @@ void DashLevel::pre_render()
             DashCollisionData groundData = test_collision(tempPlayer, &collider);
             didCollide |= groundData.collided;
         }
-        if ((collider.killOnTouch && mainHitbox.collided) || mainHitbox.mtv.x < -0.1f)
+        for (uintg i = 0; i < 4; ++i)
+            tempPlayer[i] = player->position + playerPoints[i]*0.5f;
+        DashCollisionData solidHitbox = test_collision(tempPlayer, &collider);
+
+        //if ((collider.killOnTouch && mainHitbox.collided) || mainHitbox.mtv.x < -0.1f || mainHitbox.mtv.y < -0.01f)
+        if ((collider.killOnTouch && mainHitbox.collided) || solidHitbox.mtv.x < 0.f || solidHitbox.mtv.y < 0.f)
         {
             end_game(0);
             return;
@@ -144,9 +155,10 @@ void DashLevel::pre_render()
         vel.y = 0;
         float increment = Math::PI*0.5f;
         float r = -player->rotation;
-        float toR = roundf(r/increment)*increment;
+        //float toR = roundf(r/increment)*increment;
+        float toR = ceilf(r/increment-0.01f)*increment;
 
-        player->rotation = -move_towards(r, toR, std::max(abs(r-toR)*15, 1.5f)*Time::delta());
+        player->rotation = -move_towards(r, toR, std::max(abs(r-toR), 0.1f)*20.f*Time::delta());
         isGrounded = 1;
     }
     else 
@@ -156,6 +168,7 @@ void DashLevel::pre_render()
     }
     player->dirtyBounds();
     Camera::main->position.x = player->position.x + 7.5f;
+    bg->position.x = Camera::main->position.x*0.9;
 
     char buffer[16];
     snprintf(buffer, 16, "%d, %d", (int)Camera::main->position.x, (int)Camera::main->position.y);
@@ -164,7 +177,6 @@ void DashLevel::pre_render()
 }
 DashLevel::DashLevel()
 {
-    //Renderer::set_clear_color(0.2,0.2,0.3,1);
     Camera::main->set_bg(0.2,0.2,0.3);
     Camera::main->orthoSize = 10;
     Camera::main->refresh();
@@ -217,52 +229,84 @@ DashLevel::DashLevel()
 
     colliders.push_back(DashCollider(floor, ColliderType::AABB, 0));
 
+    bgTex = Texture::load(Assets::path()+"/textures/ping4-bg.png", Texture::Pixel);
+    bgMat = std::make_unique<Material>(tintShader.get());
+    bgMat->mainTex = bgTex.get();
+    bgMat->set_uniform("u_color", Vector4(0.25,0.25,0.25,1));
+    
+    bg = Object2D::create(square.get(), bgMat.get());
+    bg->scale = Vector2(250,250);
+    bg->zIndex(-1000);
+    
+
     // File format
-    // header -> ucharG enum
-    // mesh type -> ucharG enum?
-    // collider type -> ucharG enum
-    // pos -> vec2
-    // scale -> vec2
-    // rotation -> float
-    // z-index -> float
+    // (short) version
+    // object list:
+    //     (enum) mesh
+    //     (vec2) pos
+    //     (vec2) scale
+    //     (float) rotation
+    //     (float) z-index
+    //     (vec3) color
+
     uintg level = globalScene->get_component<DashSceneData>()->level;
 
     BinaryFileReader reader = BinaryFileReader(Assets::data_path()+"/level"+std::to_string(level));
     if (reader)
     {
+        shortg version = reader.read<shortg>();
+        bool failed = 0;
+        if (version != 0)
+        {
+            logmsg("Invalid version\n");
+            failed = 1;
+            goto END_READ;
+        }
         while(1)
         {
-            ucharG header = reader.read<ucharG>();
+            ucharG meshType = reader.read<ucharG>();
             if (!reader)
                 break;
-            if (header == Header::OBJ2D)
+            Vector2 pos = reader.read<Vector2>();
+            Vector2 scale = reader.read<Vector2>();
+            float rotation = reader.read<float>();
+            float zIndex = reader.read<float>();
+            Vector3 col = reader.read<Vector3>();
+            if (!reader)
             {
-                ucharG meshType = reader.read<ucharG>();
-                ucharG colliderType = reader.read<ucharG>();
-                Vector2 pos = reader.read<Vector2>();
-                Vector2 scale = reader.read<Vector2>();
-                float rotation = reader.read<float>();
-                float zIndex = reader.read<float>();
-                assert(reader);
-
-                Mesh *mesh=0;
-                if (meshType == MeshType::SQUARE) mesh=square.get();
-                else if (meshType == MeshType::TRIANGLE) mesh = triangle.get();
-                else assert(false);
-                Object2D *obj = Object2D::create(mesh, nullptr);
-                obj->position = pos;
-                obj->scale = scale;
-                obj->rotation = rotation;
-                obj->zIndex(zIndex);
-
-                DashObjData &data = objData.emplace_back(obj, colShader.get());
-                data.mat->set_uniform("u_color", Vector4(1,1,1,1));
-                obj->material = data.mat.get();
-
-                if (colliderType != ColliderType::NONE)
-                    colliders.push_back(DashCollider(obj, colliderType, mesh==triangle.get()));
+                logmsg("Error reading\n");
+                failed = 1;
+                goto END_READ;
             }
-            else assert(false);
+
+            Mesh *mesh=0;
+            if (meshType == MeshType::SQUARE) mesh=square.get();
+            else if (meshType == MeshType::TRIANGLE) mesh = triangle.get();
+            else
+            {
+                logmsg("Error reading\n");
+                failed = 1;
+                goto END_READ;
+            }
+            Object2D *obj = Object2D::create(mesh, nullptr);
+            obj->position = pos;
+            obj->scale = scale;
+            obj->rotation = rotation;
+            obj->zIndex(zIndex);
+
+            DashObjData &data = objData.emplace_back(obj, colShader.get());
+            data.mat->set_uniform("u_color", Vector4(col.x,col.y,col.z,1));
+            obj->material = data.mat.get();
+
+            colliders.push_back(DashCollider(obj,
+                meshType == MeshType::SQUARE ? ColliderType::AABB : ColliderType::TRIANGLE,
+                mesh==triangle.get()));
+        }
+END_READ:
+        if (failed)
+        {
+
+            return;
         }
     }
 
@@ -270,7 +314,6 @@ DashLevel::DashLevel()
 }
 DashLevel::~DashLevel()
 {
-    //Renderer::set_clear_color(0,0,0,1);
     Input::remove_bind("jump");
     Camera::main->reset();
 }

@@ -29,8 +29,6 @@ void DashCollider::generate()
         points[3] = Vector2( 0.66,  0.7);
         for (uintg i = 0; i < 4; ++i)
             points[i] = obj->position + (halfScale*points[i]);
-        
-        //Object2D::create(new Mesh({points[0], points[1], }, {, , , , }), );
     }
     else
     {
