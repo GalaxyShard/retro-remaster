@@ -59,9 +59,7 @@ void Minesweeper::fix_board()
 {
     Vector2 min,max;
     Vector2 ratio = Renderer::aspectRatio;
-    //float size = std::max(Renderer::aspectRatio.x, Renderer::aspectRatio.y);
-    // 16:9 == 1.77
-    if (ratio.x > 1.7f || ratio.y > 1.25f) min = Vector2(-1,-1), max = Vector2(1,1);
+    if (ratio.y > 1.25f) min = Vector2(-1,-1), max = Vector2(1,1);
     else min = Vector2(-0.9,-1), max = Vector2(0.9,0.8);
 
     group->pos = (min+max)/2;
@@ -272,18 +270,21 @@ Minesweeper::Minesweeper()
     menuTex = Texture::load(Assets::path()+"/textures/menuButton.png", Texture::Pixel);
 
     UIImage *nav = UIImage::create();
+    nav->group = UIGroup::safeArea;
     nav->tint = Vector4(0.2, 0.2, 0.2, 1);
     nav->anchor = Vector2(0, 1);
     nav->scale = Vector2(20, 0.18f);
     nav->pos = Vector2(0, -nav->scale.y*0.5f);
 
     timer = UIText::create("00:00");
+    timer->group = UIGroup::safeArea;
     timer->anchor = Vector2(1, 1);
     timer->scale = Vector2(0.3, 0.3);
     timer->pivot = Vector2(0, 0);
     timer->pos = Vector2(-0.2f, -0.1f);
 
     flagsText = UIText::create("0");
+    flagsText->group = UIGroup::safeArea;
     flagsText->anchor = Vector2(-1, 1);
     flagsText->scale = Vector2(0.1, 0.1);
     flagsText->pivot = Vector2(0, 0);
@@ -292,43 +293,34 @@ Minesweeper::Minesweeper()
 
 #if OS_MOBILE || OS_WEB
     flagButton = UIImage::create(flagTex.get());
+    flagButton->group = UIGroup::safeArea;
     flagButton->scale = Vector2(0.4f, 0.4f);
     flagButton->pos += flagButton->scale / 2;
     flagButton->pos.x = -flagButton->pos.x;
     flagButton->anchor = Vector2(1, -1);
 #if OS_MOBILE
-    flagButton->onTouchDown = [this]()
-    {
-        Input::trigger("place_flag", 1);
-        flagButton->tint = Vector4(0.5, 0.5, 0.5, 1);
-    };
-    flagButton->onTouchUp = [this]()
-    {
-        Input::trigger("place_flag", 0);
-        flagButton->tint = Vector4(1,1,1,1);
-    };
+    flagButton->onTouchDown = [](){ Input::trigger("place_flag", 1); };
+    flagButton->onTouchUp = [](){ Input::trigger("place_flag", 0); };
 #else
-    flagButton->onClick = [this]()
-    {
-        bool isHeld = !Input::is_held("place_flag");
-        Input::trigger("place_flag", isHeld);
-        flagButton->tint = isHeld ? Vector4(0.5, 0.5, 0.5, 1) : Vector4(1,1,1,1);
-    };
+    flagButton->onClick = [](){ Input::trigger("place_flag", !Input::is_held("place_flag")); };
 #endif
 #endif
     UIImage *restartBtn = UIImage::create(restartTex.get());
+    restartBtn->group = UIGroup::safeArea;
     restartBtn->anchor = Vector2(-1, 1);
     restartBtn->scale = Vector2(0.15, 0.15);
     restartBtn->pos = Vector2(0.5f, -restartBtn->scale.y/2-0.02);
     restartBtn->onClick = CLASS_LAMBDA(clear_board);
 
     UIImage *continueBtn = UIImage::create(continueTex.get());
+    continueBtn->group = UIGroup::safeArea;
     continueBtn->anchor = Vector2(1, 1);
     continueBtn->scale = Vector2(0.15, 0.15);
     continueBtn->pos = Vector2(-0.5f, -continueBtn->scale.y/2-0.02);
     continueBtn->onClick = CLASS_LAMBDA(continue_game);
 
     UIImage *menuBtn = UIImage::create(menuTex.get());
+    menuBtn->group = UIGroup::safeArea;
 	TINT_ON_CLICK(menuBtn, (1,1,1,1), (0.75,0.75,0.75,1));
     menuBtn->anchor = Vector2(1, 1);
     menuBtn->scale = Vector2(0.15, 0.15);
@@ -341,49 +333,39 @@ Minesweeper::Minesweeper()
 
 
     map = new Tile[tiles];
-//#if OS_MOBILE
-//    Vector2 min = Vector2(-1,-1), max = Vector2(1,1);
-//#else
-//    Vector2 min = Vector2(-0.9,-1), max = Vector2(0.9,0.8);
-//#endif
     
     group = UIGroup::create();
-    //group->pos = (min+max)/2;
-    //group->scale = (max-min)/2;
     group->parent(UIGroup::aspectRatio);
     group->anchor = Vector2(0,0);
-    //group->cache();
     fix_board();
     aspectConn = Renderer::aspect_ratio_changed().connect(CLASS_LAMBDA(fix_board));
 
-    Vector2 mapSize = Vector2(mapWidth, mapHeight);
-    Vector2 imgSize = Vector2(2,2) / mapSize;
-    //Vector2 imgSize = (max-min) / mapSize;
-    {
-        float minSize = std::min(imgSize.x, imgSize.y);
-        imgSize = Vector2(minSize, minSize);
-    }
+    Vector2 imgSize = Vector2(std::min(2.f/mapWidth, 2.f/mapHeight),0);
+    imgSize.y = imgSize.x;
+
     for (unsigned int i = 0; i < tiles; ++i)
     {
         Vector2Int tile = Vector2Int(i % mapWidth, i / mapWidth);
         UIImage *img = UIImage::create(tileTex.get());
         map[i].img = img;
         img->group = group;
-        //img->group = UIGroup::aspectRatio;
 
         img->scale = imgSize;
         img->pos = imgSize*tile + img->scale*0.5f;
-        //img->pos = imgSize*tile + img->scale/2 + (Vector2(1,1)+min);
 
         imgToTile[img] = i;
         img->onClick = CLASS_LAMBDA(on_click);
     }
+#if OS_MOBILE || OS_WEB
+    Input::add_bind("place_flag", Key::LeftShift, [this](bool p)
+    { flagButton->tint = p ? Vector4(0.5, 0.5, 0.5, 1) : Vector4(1,1,1,1); });
+#else
     Input::add_bind("place_flag", Key::LeftShift);
+#endif
 }
 Minesweeper::~Minesweeper()
 {
-    if (Input::is_held("place_flag"))
-        Input::trigger("place_flag", 0);
+    Input::trigger("place_flag", 0);
     Input::remove_bind("place_flag");
     delete[] map;
 }

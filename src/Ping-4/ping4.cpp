@@ -6,7 +6,6 @@ struct Ping4
     AssetRef<Texture> menuTex, playTex, restartTex, bgTex;
     AssetRef<Shader> gradientShader, colShader, tintShader;
 
-    int score = 0;
     UIText *scoreText;
 
     UIImage *toggleGameBtn;
@@ -19,6 +18,9 @@ struct Ping4
     Listener preRenderConn, inputUpdateConn;
     ListenerT<TouchData> touchInputConn;
     Vector2 velocity;
+
+    int score = 0;
+    bool gameInProgress=0;
 
     void clamp_paddles();
     bool check_collision(Object2D *obj);
@@ -217,6 +219,7 @@ Ping4::Ping4()
 
 
     UIImage *menuBtn = UIImage::create(menuTex.get());
+    menuBtn->group = UIGroup::safeArea;
 	TINT_ON_CLICK(menuBtn, (1,1,1,1), (0.75,0.75,0.75,1));
     menuBtn->anchor = Vector2(1, 1);
     menuBtn->scale = Vector2(0.15, 0.15);
@@ -228,13 +231,13 @@ Ping4::Ping4()
         Scene::create("Start");
     };
     toggleGameBtn = UIImage::create(playTex.get());
+    toggleGameBtn->group = UIGroup::safeArea;
     toggleGameBtn->anchor = Vector2(1, 1);
     toggleGameBtn->scale = Vector2(0.15, 0.15);
 
     toggleGameBtn->pos = Vector2(-0.3f, -toggleGameBtn->scale.y/2-0.02);
     toggleGameBtn->onClick = [this]()
     {
-        static bool gameInProgress = 0;
         if (gameInProgress)
         {
             Scene::destroy(Scene::activeScene);
@@ -242,14 +245,15 @@ Ping4::Ping4()
         }
         else
         {
+            gameInProgress = 1;
             preRenderConn = Renderer::pre_render().connect(CLASS_LAMBDA(pre_render));
             toggleGameBtn->texture = restartTex.get();
             velocity = random_unit();
         }
-        gameInProgress = !gameInProgress;
     };
 
     scoreText = UIText::create("0");
+    scoreText->group = UIGroup::safeArea;
     scoreText->anchor = Vector2(-1,1);
     scoreText->pivot = Vector2(0,0);
     scoreText->scale = Vector2(0.15, 0.15);

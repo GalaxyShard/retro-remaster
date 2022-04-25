@@ -155,7 +155,6 @@ void DashLevel::pre_render()
         vel.y = 0;
         float increment = Math::PI*0.5f;
         float r = -player->rotation;
-        //float toR = roundf(r/increment)*increment;
         float toR = ceilf(r/increment-0.01f)*increment;
 
         player->rotation = -move_towards(r, toR, std::max(abs(r-toR), 0.1f)*20.f*Time::delta());
@@ -196,6 +195,7 @@ DashLevel::DashLevel()
     bgAudio->play();
 
     UIImage *menuBtn = UIImage::create(menuTex.get());
+    menuBtn->group = UIGroup::safeArea;
 	TINT_ON_CLICK(menuBtn, (1,1,1,1), (0.75,0.75,0.75,1));
     menuBtn->anchor = Vector2(1, 1);
     menuBtn->scale = Vector2(0.15, 0.15);

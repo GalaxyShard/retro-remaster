@@ -13,18 +13,6 @@ struct EditorObjData
 };
 struct DashEditState { enum : ucharG { PAN,TRASH }; };
 
-struct UIElement
-{
-    void *data;
-    enum {UIIMAGE,UITEXT} type;
-    UIElement(UIImage *img) : data(img), type(UIIMAGE){}
-    UIElement(UIText *txt) : data(txt), type(UITEXT){}
-};
-struct DashEditorMenu
-{
-    UIGroup *group;
-    std::vector<UIElement> ui;
-};
 struct DashEditor
 {
     AssetRef<Texture> menuTex;
@@ -39,7 +27,7 @@ struct DashEditor
     UIImage *trashBtn, *panBtn;
     UIText *coordsText, *saveText;
 
-    DashEditorMenu *colorEditor = 0;
+    UIContainer *colorEditor = 0;
 
     uintg selectedObj = NO_OBJ;
     uintg saveSlot = 0;
@@ -249,6 +237,7 @@ DashEditor::DashEditor()
     inputConn = Input::touch_changed().connect(TYPE_LAMBDA(handle_touch, TouchData));
 
     UIImage *menuBtn = UIImage::create(menuTex.get());
+    menuBtn->group = UIGroup::safeArea;
 	TINT_ON_CLICK(menuBtn, (1,1,1,1), (0.75,0.75,0.75,1));
     menuBtn->anchor = Vector2(1, 1);
     menuBtn->scale = Vector2(0.15, 0.15);

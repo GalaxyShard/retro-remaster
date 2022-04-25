@@ -241,6 +241,7 @@ Snake::Snake()
     human->zIndex(1);
 
     UIImage *menuBtn = UIImage::create(menuTex.get());
+    menuBtn->group = UIGroup::safeArea;
 	TINT_ON_CLICK(menuBtn, (1,1,1,1), (0.75,0.75,0.75,1));
     menuBtn->anchor = Vector2(1, 1);
     menuBtn->scale = Vector2(0.15, 0.15);
@@ -252,6 +253,7 @@ Snake::Snake()
         Scene::create("Start");
     };
     UIImage *restartBtn = UIImage::create(restartTex.get());
+    restartBtn->group = UIGroup::safeArea;
     restartBtn->anchor = Vector2(-1, 1);
     restartBtn->scale = Vector2(0.15, 0.15);
 
@@ -262,6 +264,7 @@ Snake::Snake()
         Scene::create("Snake");
     };
     score = UIText::create("0");
+    score->group = UIGroup::safeArea;
     score->anchor = Vector2(-1,1);
     score->pivot = Vector2(0,0);
     score->scale = Vector2(0.15, 0.15);

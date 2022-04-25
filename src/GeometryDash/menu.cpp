@@ -20,6 +20,7 @@ DashMenu::DashMenu()
     menuTex = Texture::load(Assets::path()+"/textures/menuButton.png", Texture::Pixel);
     
     UIImage *menuBtn = UIImage::create(menuTex.get());
+    menuBtn->group = UIGroup::safeArea;
 	TINT_ON_CLICK(menuBtn, (1,1,1,1), (0.75,0.75,0.75,1));
     menuBtn->anchor = Vector2(1, 1);
     menuBtn->scale = Vector2(0.15, 0.15);

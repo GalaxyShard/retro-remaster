@@ -7,13 +7,15 @@ Scene *globalScene;
 
 // for gitpod:
 // source /workspace/emsdk/emsdk_env.sh
-// emcmake cmake -B bin/web -DENGINE_ROOT=/workspace/Galaxy-Engine -DRELEASE=1
+// emcmake cmake -B bin/web -DENGINE_ROOT=/workspace/Galaxy-Engine
 // emmake make -C bin/web -j8
 
 struct StartScene
 {
     Scene *scene;
     std::string sceneToOpen = "";
+    std::unique_ptr<UIContainer> menu;
+
     void init_menu(std::string name, std::string sceneName, std::string tutorial);
     StartScene();
     ~StartScene();
@@ -26,9 +28,9 @@ void StartScene::init_menu(std::string name, std::string sceneName, std::string 
     
     UIGroup *group = UIGroup::create();
     group->scale = Vector2(0.75, 0.5);
-    //group->parent(UIGroup::aspectRatio);
     group->cache();
     
+    menu = std::make_unique<UIContainer>(group);
     
     UIImage *background = UIImage::create();
     background->group = group;
@@ -36,20 +38,23 @@ void StartScene::init_menu(std::string name, std::string sceneName, std::string 
     background->scaleToFit = 1;
     background->scale = Vector2(2,2);
     background->tint = Vector4(0.6,0.6,0.6,1);
+    menu->add(background);
 
     UIText *title = UIText::create(name);
     title->group = group;
     title->anchor = Vector2(0,1);
-    title->scale = Vector2(1.5, 0.5);
+    title->scale = Vector2(1.5, 0.3);
     title->pivot = Vector2(0, 0);
-    title->pos = Vector2(0.25, -0.25);
+    title->pos = Vector2(0.15, -0.15);
+    menu->add(title);
 
     UIImage *exitBtn = UIImage::create();
     exitBtn->group = group;
     exitBtn->anchor = Vector2(-1,1);
-    exitBtn->scale = Vector2(0.5,0.5);
-    exitBtn->pos = Vector2(0.25, -0.25);
+    exitBtn->scale = Vector2(0.3,0.3);
+    exitBtn->pos = Vector2(0.15, -0.15);
     TINT_ON_CLICK(exitBtn, (1,0,0,1), (0.75,0,0,1));
+    menu->add(exitBtn);
 
     exitBtn->onClick = []()
     {
@@ -60,16 +65,16 @@ void StartScene::init_menu(std::string name, std::string sceneName, std::string 
     UIImage *playBtn = UIImage::create();
     playBtn->group = group;
     playBtn->anchor = Vector2(1,-1);
-    playBtn->scale = Vector2(1,0.5);
-    playBtn->pos = Vector2(-0.5, 0.25);
+    playBtn->scale = Vector2(0.75,0.3);
+    playBtn->pos = Vector2(-0.375, 0.15);
     TINT_ON_CLICK(playBtn, (0.9,0.9,0.9,1), (0.8,0.8,0.8,1));
+    menu->add(playBtn);
     
-    text_for_img("Play", playBtn);
+    menu->add(text_for_img("Play", playBtn));
 
     playBtn->onClick = [this](){
-        std::string open = sceneToOpen;
         Scene::destroy(scene);
-        Scene::create(open);
+        Scene::create(sceneToOpen);
     };
 }
 
@@ -77,23 +82,22 @@ StartScene::StartScene()
 {
     scene = Scene::activeScene;
     UIImage *topBar = UIImage::create();
+    topBar->group = UIGroup::safeArea;
     topBar->anchor = Vector2(0, 1);
     topBar->scale = Vector2(2, 0.35);
     topBar->tint = Vector4(0.85,0.85,0.85,1);
     topBar->scaleToFit = 1;
     UIText *title = UIText::create("Retro Collection");
+    title->group = UIGroup::safeArea;
     title->anchor = Vector2(0, 1);
     title->pivot = Vector2(0,1);
     title->scale = Vector2(2,0.35/2);
-    //img_for_text(title);
     title->pos.y = -title->scale.y/2;
-
-    //logmsg("(%.3o), (%.3o)\n", (Vector2)title->get_mesh()->aabbMin, (Vector2)title->get_mesh()->aabbMax);
-    //Mesh::export_obj(title->get_mesh(), Assets::data_path()+"/text.obj");
 
     Vector2 gameSize = Vector2(0.5, 0.25);
 
     UIImage *minesweeperBtn = UIImage::create();
+    minesweeperBtn->group = UIGroup::safeArea;
     TINT_ON_CLICK_D(minesweeperBtn);
     minesweeperBtn->scale = gameSize;
     minesweeperBtn->pos = Vector2(0.1,0.1) + minesweeperBtn->scale/2.f;
@@ -108,6 +112,7 @@ StartScene::StartScene()
         );
     };
     UIImage *snakeBtn = UIImage::create();
+    snakeBtn->group = UIGroup::safeArea;
     TINT_ON_CLICK_D(snakeBtn);
     snakeBtn->anchor = Vector2(0,-1);
     snakeBtn->scale = gameSize;
@@ -122,6 +127,7 @@ StartScene::StartScene()
         );
     };
     UIImage *pong4Btn = UIImage::create();
+    pong4Btn->group = UIGroup::safeArea;
     TINT_ON_CLICK_D(pong4Btn);
     pong4Btn->anchor = Vector2(1,-1);
     pong4Btn->scale = gameSize;
@@ -137,6 +143,7 @@ StartScene::StartScene()
     };
 
     UIImage *dashBtn = UIImage::create();
+    dashBtn->group = UIGroup::safeArea;
     TINT_ON_CLICK_D(dashBtn);
     dashBtn->anchor = Vector2(-1,-1);
     dashBtn->scale = gameSize;
@@ -148,6 +155,7 @@ StartScene::StartScene()
     };
 
     UIImage *testBtn = UIImage::create();
+    testBtn->group = UIGroup::safeArea;
     TINT_ON_CLICK_D(testBtn);
     testBtn->anchor = Vector2(0,-1);
     testBtn->scale = gameSize;
