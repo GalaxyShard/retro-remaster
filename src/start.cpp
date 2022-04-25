@@ -15,14 +15,16 @@ struct StartScene
     Scene *scene;
     std::string sceneToOpen = "";
     std::unique_ptr<UIContainer> menu;
+    // void *sceneOptions = 0;
 
-    void init_menu(std::string name, std::string sceneName, std::string tutorial);
+    void init_menu(std::string name, std::string sceneName, std::string tutorial, Callback createOpts=nullptr);
+    void minesweeper_options();
     StartScene();
     ~StartScene();
 };
 #define TINT_ON_CLICK_D(img) TINT_ON_CLICK(img, (0.6,0.6,0.6,1), (0.5,0.5,0.5,1))
 
-void StartScene::init_menu(std::string name, std::string sceneName, std::string tutorial)
+void StartScene::init_menu(std::string name, std::string sceneName, std::string tutorial, Callback createOpts)
 {
     sceneToOpen = sceneName;
     
@@ -30,6 +32,8 @@ void StartScene::init_menu(std::string name, std::string sceneName, std::string 
     group->scale = Vector2(0.75, 0.5);
     group->cache();
     
+    // free(sceneOptions);
+    // sceneOptions = 0;
     menu = std::make_unique<UIContainer>(group);
     
     UIImage *background = UIImage::create();
@@ -76,6 +80,27 @@ void StartScene::init_menu(std::string name, std::string sceneName, std::string 
         Scene::destroy(scene);
         Scene::create(sceneToOpen);
     };
+    createOpts();
+}
+void StartScene::minesweeper_options()
+{
+    UIImage *flagOpt = UIImage::create();
+    flagOpt->group = menu->group;
+    flagOpt->scale = Vector2(1.5, 0.3);
+    flagOpt->anchor = Vector2(-1, 1);
+    flagOpt->pos = Vector2(0.75, -0.15*3 - 0.05);
+    menu->add(flagOpt);
+    UIText *flagText = text_for_img("Flag Mode - Toggle", flagOpt);
+
+    flagOpt->onClick = [this]()
+    {
+        bool &toggle = globalScene->get_component<MinesweeperOptions>()->flagModeToggle;
+        toggle = !toggle;
+        UIImage::get_held()->tint = toggle ? Vector4(0,1,0,1) : Vector4(1,0,0,1);
+    };
+    globalScene->add_component<MinesweeperOptions>();
+    bool toggle = globalScene->get_component<MinesweeperOptions>()->flagModeToggle;
+    flagOpt->tint = toggle ? Vector4(0,1,0,1) : Vector4(1,0,0,1);
 }
 
 StartScene::StartScene()
@@ -108,7 +133,8 @@ StartScene::StartScene()
             "A logic game where the goal is to find all of the bombs without clicking on any of them.\n"
             "The numbers that appear on each tile represent the amount of bombs that are adjacent to it\n"
             "To start, click randomly on tiles until it is possible to determine which tiles are safe and which ones have bombs\n"
-            "Flags can be placed by holding Shift or clicking the flag button, they prevent accidentally clicking on bombs"
+            "Flags can be placed by holding Shift or clicking the flag button, they prevent accidentally clicking on bombs",
+            CLASS_LAMBDA(minesweeper_options)
         );
     };
     UIImage *snakeBtn = UIImage::create();

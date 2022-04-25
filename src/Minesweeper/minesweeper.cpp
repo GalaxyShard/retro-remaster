@@ -298,12 +298,15 @@ Minesweeper::Minesweeper()
     flagButton->pos += flagButton->scale / 2;
     flagButton->pos.x = -flagButton->pos.x;
     flagButton->anchor = Vector2(1, -1);
-#if OS_MOBILE
-    flagButton->onTouchDown = [](){ Input::trigger("place_flag", 1); };
-    flagButton->onTouchUp = [](){ Input::trigger("place_flag", 0); };
-#else
-    flagButton->onClick = [](){ Input::trigger("place_flag", !Input::is_held("place_flag")); };
-#endif
+    if (globalScene->get_component<MinesweeperOptions>()->flagModeToggle)
+    {
+        flagButton->onClick = [](){ Input::trigger("place_flag", !Input::is_held("place_flag")); };
+    }
+    else
+    {
+        flagButton->onTouchDown = [](){ Input::trigger("place_flag", 1); };
+        flagButton->onTouchUp = [](){ Input::trigger("place_flag", 0); };
+    }
 #endif
     UIImage *restartBtn = UIImage::create(restartTex.get());
     restartBtn->group = UIGroup::safeArea;
