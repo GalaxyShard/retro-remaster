@@ -223,9 +223,9 @@ void DashEditor::save_game(bool exitOnFinish)
 DashEditor::DashEditor()
 {
     Camera::main->set_bg(0.2,0.2,0.3);
-    Camera::main->orthoSize = 10;
+    Camera::main->orthoSize = 7.5;
     Camera::main->refresh();
-    Camera::main->position.x = 7.5;
+    Camera::main->position.x = 5;
 
     menuTex = Texture::load(Assets::path()+"/textures/menuButton.png", Texture::Pixel);
 

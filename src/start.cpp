@@ -91,6 +91,7 @@ void StartScene::minesweeper_options()
     flagOpt->pos = Vector2(0.75, -0.15*3 - 0.05);
     menu->add(flagOpt);
     UIText *flagText = text_for_img("Flag Mode - Toggle", flagOpt);
+    menu->add(flagText);
 
     flagOpt->onClick = [this]()
     {

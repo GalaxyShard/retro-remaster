@@ -57,7 +57,7 @@ struct DashLevel
     float jumpHeight = 2;
     Vector3 vel;
 
-    bool jump=0, gameEnded=0, isGrounded=1;
+    bool queueJump=0, jump=0, gameEnded=0, isGrounded=1;
 
     void pre_render();
     void end_game(bool won);
@@ -94,14 +94,18 @@ float move_towards(float current, float goal, float speed)
 }
 void DashLevel::handle_touch(TouchData data)
 {
+    if (data.state == TouchState::PRESSED)
+        queueJump = 1;
     jump = data.state != TouchState::RELEASED;
 }
 void DashLevel::pre_render()
 {
-    if (jump && isGrounded)
-    {
+    if ((jump||queueJump) && isGrounded)
         vel.y = sqrt(jumpHeight*2*-gravity);
-    }
+    
+    if (queueJump)
+        queueJump = 0;
+
     player->position.x += speed * Time::delta();
     player->position.y += vel.y * Time::delta();
     if (!isGrounded)
@@ -166,7 +170,7 @@ void DashLevel::pre_render()
         isGrounded = 0;
     }
     player->dirtyBounds();
-    Camera::main->position.x = player->position.x + 7.5f;
+    Camera::main->position.x = player->position.x + 5.f;
     bg->position.x = Camera::main->position.x*0.9;
 
     char buffer[16];
@@ -177,7 +181,7 @@ void DashLevel::pre_render()
 DashLevel::DashLevel()
 {
     Camera::main->set_bg(0.2,0.2,0.3);
-    Camera::main->orthoSize = 10;
+    Camera::main->orthoSize = 7.5;
     Camera::main->refresh();
     menuTex = Texture::load(Assets::path()+"/textures/menuButton.png", Texture::Pixel);
 

@@ -4,17 +4,10 @@ struct Snake
 {
     float speed = 1.f/5;
     int width = 15, height = 15;
-    
-#if OS_MOBILE
-    Vector2 minBounds = Vector2(-1,-1);
-    Vector2 maxBounds = Vector2(1,1);
+
     float tileSize = 2.f/width;
-#else
-    Vector2 minBounds = Vector2(-0.9,-1);
-    Vector2 maxBounds = Vector2(0.9,0.8);
-    float tileSize = 1.8f/width;
-#endif
-    Listener preRenderConn;
+
+    Listener preRenderConn, aspectConn;
     ListenerT<TouchData> touchInputConn;
 
     double lastMove = 0;
@@ -44,9 +37,22 @@ struct Snake
     void pre_render();
     void end_game();
     void move_human();
+    void fix_board();
     Snake();
     ~Snake();
 };
+void Snake::fix_board()
+{
+    Vector2 ratio = Renderer::aspectRatio;
+    float size,pos;
+    if (ratio.y > 1.25f) size=1, pos=0;
+    else size=1.111111f, pos=0.111111f;
+
+    Camera::main->orthoSize = size;
+    Camera::main->position.y = pos;
+
+    Camera::main->refresh();
+}
 
 int random(int min, int max) { return rand()%(max-min)+min; }
 void Snake::set_move_dir(int x, int y)
@@ -63,7 +69,8 @@ void Snake::end_game()
 {
     UIImage *image = UIImage::create();
     image->anchor = Vector2();
-    image->tint = Vector4(.5,.5,.5,.75);
+    constexpr float grey = 0.2f;
+    image->tint = Vector4(grey,grey,grey,0.5f);
     image->scale = Vector2(1,0.3);
     UIText *text = UIText::create("Game Over");
     text->anchor = Vector2();
@@ -156,7 +163,7 @@ void Snake::touch_changed(TouchData data)
             touchCircle = Texture::load(Assets::path()+"/textures/4-circle.png", Texture::Pixel);
             touchIndicatorMat->mainTex = touchCircle.get();
         }
-        touchIndicator->position = touchOrigin;
+        touchIndicator->position = touchOrigin*Camera::main->orthoSize+Camera::main->position;
         touchIndicator->scale = Vector2(activateDist, activateDist)*4;
     }
     else if (data.state == MOVED)
@@ -188,8 +195,9 @@ void Snake::touch_changed(TouchData data)
 }
 Snake::Snake()
 {
-    Camera::main->orthoSize = 1;
-    Camera::main->refresh();
+    //Camera::main->orthoSize = 1;
+    //Camera::main->refresh();
+    fix_board();
     Input::add_bind("up", Key::W, [this](bool pressed)
     { if (pressed) set_move_dir(0,1); });
     
@@ -202,8 +210,9 @@ Snake::Snake()
     Input::add_bind("right", Key::D, [this](bool pressed)
     { if (pressed) set_move_dir(1,0); });
 
-    touchInputConn = Input::touch_changed().connect(TYPE_LAMBDA(touch_changed, TouchData));
+    touchInputConn = Input::touch_changed().connect(TYPE_LAMBDA(touch_changed, auto));
     preRenderConn = Renderer::pre_render().connect(CLASS_LAMBDA(pre_render));
+    aspectConn = Renderer::aspect_ratio_changed().connect(CLASS_LAMBDA(fix_board));
 
     square = Mesh::load_obj(Assets::gpath()+"/models/square.obj");
     colShader = Shader::load(Assets::gpath()+SHADER_FOLDER+"/color.shader");
@@ -222,8 +231,7 @@ Snake::Snake()
     bgMat = std::make_unique<Material>(texShader.get());
     bgMat->mainTex = tileTex.get();
     background = Object2D::create(square.get(), bgMat.get());
-    background->scale = maxBounds - minBounds;
-    background->position = (minBounds + maxBounds)/2;
+    background->scale = Vector2(2,2);
     background->zIndex(-1000);
 
     playerMat = std::make_unique<Material>(texShader.get());

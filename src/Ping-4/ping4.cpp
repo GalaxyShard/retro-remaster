@@ -58,7 +58,8 @@ void Ping4::end_game()
 
     UIImage *image = UIImage::create();
     image->anchor = Vector2();
-    image->tint = Vector4(0.75,0.75,0.75,0.5);
+    constexpr float grey = 0.2f;
+    image->tint = Vector4(grey,grey,grey,0.5f);
     image->scale = Vector2(1, 0.3);
     UIText *text = UIText::create("Game Over");
     text->scale = image->scale * 0.95f;

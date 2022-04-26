@@ -88,7 +88,6 @@ void Minesweeper::end_game(bool won)
     {
         for (uintg i = 0; i < tiles; ++i)
         {
-            //if ((map[i].flags & ISBOMB) && !(map[i].flags & ISFLAGGED))
             if (map[i].flags == ISBOMB)
             {
                 map[i].flags |= ISFLAGGED;
