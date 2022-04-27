@@ -122,13 +122,13 @@ void Minesweeper::continue_game()
 
     if (gameWon) return;
     startTime = Time::get();
-    renderConn = Renderer::pre_render().connect(CLASS_LAMBDA(pre_render));
+    renderConn = Renderer::pre_render().connect(MK_LAMBDA(pre_render));
 }
 void Minesweeper::start_game()
 {
     gameStarted = 1;
     startTime = Time::get();
-    renderConn = Renderer::pre_render().connect(CLASS_LAMBDA(pre_render));
+    renderConn = Renderer::pre_render().connect(MK_LAMBDA(pre_render));
     for (unsigned int i = 0; i < bombs; ++i)
     {
         int bomb;
@@ -312,14 +312,14 @@ Minesweeper::Minesweeper()
     restartBtn->anchor = Vector2(-1, 1);
     restartBtn->scale = Vector2(0.15, 0.15);
     restartBtn->pos = Vector2(0.5f, -restartBtn->scale.y/2-0.02);
-    restartBtn->onClick = CLASS_LAMBDA(clear_board);
+    restartBtn->onClick = MK_LAMBDA(clear_board);
 
     UIImage *continueBtn = UIImage::create(continueTex.get());
     continueBtn->group = UIGroup::safeArea;
     continueBtn->anchor = Vector2(1, 1);
     continueBtn->scale = Vector2(0.15, 0.15);
     continueBtn->pos = Vector2(-0.5f, -continueBtn->scale.y/2-0.02);
-    continueBtn->onClick = CLASS_LAMBDA(continue_game);
+    continueBtn->onClick = MK_LAMBDA(continue_game);
 
     UIImage *menuBtn = UIImage::create(menuTex.get());
     menuBtn->group = UIGroup::safeArea;
@@ -340,7 +340,7 @@ Minesweeper::Minesweeper()
     group->parent(UIGroup::aspectRatio);
     group->anchor = Vector2(0,0);
     fix_board();
-    aspectConn = Renderer::aspect_ratio_changed().connect(CLASS_LAMBDA(fix_board));
+    aspectConn = Renderer::aspect_ratio_changed().connect(MK_LAMBDA(fix_board));
 
     Vector2 imgSize = Vector2(std::min(2.f/mapWidth, 2.f/mapHeight),0);
     imgSize.y = imgSize.x;
@@ -356,7 +356,7 @@ Minesweeper::Minesweeper()
         img->pos = imgSize*tile + img->scale*0.5f;
 
         imgToTile[img] = i;
-        img->onClick = CLASS_LAMBDA(on_click);
+        img->onClick = MK_LAMBDA(on_click);
     }
 #if OS_MOBILE || OS_WEB
     Input::add_bind("place_flag", Key::LeftShift, [this](bool p)

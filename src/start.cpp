@@ -135,7 +135,7 @@ StartScene::StartScene()
             "The numbers that appear on each tile represent the amount of bombs that are adjacent to it\n"
             "To start, click randomly on tiles until it is possible to determine which tiles are safe and which ones have bombs\n"
             "Flags can be placed by holding Shift or clicking the flag button, they prevent accidentally clicking on bombs",
-            CLASS_LAMBDA(minesweeper_options)
+            MK_LAMBDA(minesweeper_options)
         );
     };
     UIImage *snakeBtn = UIImage::create();
@@ -224,7 +224,7 @@ void FPSCounter::pre_render()
 }
 FPSCounter::FPSCounter()
 {
-    renderConn = Renderer::pre_render().connect(CLASS_LAMBDA(pre_render));
+    renderConn = Renderer::pre_render().connect(MK_LAMBDA(pre_render));
     fpsText = UIText::create("MS: 0.0");
     fpsText->group = UIGroup::safeArea;
     fpsText->anchor = Vector2(0, 1);

@@ -2,6 +2,29 @@
 #include <global.hpp>
 #include <GeometryDash/dash.hpp>
 
+//#define ADD_4(m) m(4) ADD_3(m)
+//#define ADD_3(m) m(3) ADD_2(m)
+//#define ADD_2(m) m(2) ADD_1(m)
+//#define ADD_1(m) m(1)
+//#define ADD_0(m) 
+
+//#define ADD_N_TIMES(macro, n) ADD_##n(macro)
+//#define ARG_LAMBDA(func,n) \
+//    [this](auto v0 ADD_N_TIMES(ARGUMENT, n)) \
+//    {func(v0 ADD_N_TIMES(PASSED_ARG, n));}
+
+//#define ARGUMENT(n) ,auto v##n
+//#define PASSED_ARG(n) ,v##n
+//#define VSC(v) v
+//struct TestStruct
+//{
+//    void test()
+//    {
+//        ARG_LAMBDA(test, 1);
+//        VSC(ARG_LAMBDA(test, 2));
+//    }
+//};
+
 constexpr uintg NO_OBJ = ~0u;
 struct EditorObjData
 {
@@ -216,7 +239,7 @@ void DashEditor::save_game(bool exitOnFinish)
                 Scene::create("Dash");
             }
         });
-    else Assets::sync_files(TYPE_LAMBDA(save_finished, bool));
+    else Assets::sync_files(ARG_LAMBDA(save_finished));
 }
 #define TINT_ON_CLICK_D(img) TINT_ON_CLICK(img, (1,1,1,1), (0.75,0.75,0.75,1))
 
@@ -234,7 +257,7 @@ DashEditor::DashEditor()
     colShader = Shader::load(Assets::gpath()+SHADER_FOLDER+"/color.shader");
     tintShader = Shader::load(Assets::gpath()+SHADER_FOLDER+"/tint.shader");
 
-    inputConn = Input::touch_changed().connect(TYPE_LAMBDA(handle_touch, TouchData));
+    inputConn = Input::touch_changed().connect(ARG_LAMBDA(handle_touch));
 
     UIImage *menuBtn = UIImage::create(menuTex.get());
     menuBtn->group = UIGroup::safeArea;
@@ -248,7 +271,7 @@ DashEditor::DashEditor()
     saveBtn->anchor = Vector2(-1, 1);
     saveBtn->scale = Vector2(0.35, 0.15);
     saveBtn->pos = Vector2(0.175f, -saveBtn->scale.y/2);
-    saveBtn->onClick = CLASS_LAMBDA(save_game);
+    saveBtn->onClick = MK_LAMBDA(save_game);
     saveText = text_for_img("Save", saveBtn);
 
     panBtn = UIImage::create();

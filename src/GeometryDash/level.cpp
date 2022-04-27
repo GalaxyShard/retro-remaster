@@ -185,8 +185,8 @@ DashLevel::DashLevel()
     Camera::main->refresh();
     menuTex = Texture::load(Assets::path()+"/textures/menuButton.png", Texture::Pixel);
 
-    renderConn = Renderer::pre_render().connect(CLASS_LAMBDA(pre_render));
-    inputConn = Input::touch_changed().connect(TYPE_LAMBDA(handle_touch, TouchData));
+    renderConn = Renderer::pre_render().connect(MK_LAMBDA(pre_render));
+    inputConn = Input::touch_changed().connect(ARG_LAMBDA(handle_touch));
 
     square = Mesh::load_obj(Assets::gpath()+"/models/square.obj");
     triangle = Mesh::load_obj(Assets::path()+"/models/triangle.obj");

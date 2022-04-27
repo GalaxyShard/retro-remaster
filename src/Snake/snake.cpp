@@ -210,9 +210,9 @@ Snake::Snake()
     Input::add_bind("right", Key::D, [this](bool pressed)
     { if (pressed) set_move_dir(1,0); });
 
-    touchInputConn = Input::touch_changed().connect(TYPE_LAMBDA(touch_changed, auto));
-    preRenderConn = Renderer::pre_render().connect(CLASS_LAMBDA(pre_render));
-    aspectConn = Renderer::aspect_ratio_changed().connect(CLASS_LAMBDA(fix_board));
+    touchInputConn = Input::touch_changed().connect(ARG_LAMBDA(touch_changed));
+    preRenderConn = Renderer::pre_render().connect(MK_LAMBDA(pre_render));
+    aspectConn = Renderer::aspect_ratio_changed().connect(MK_LAMBDA(fix_board));
 
     square = Mesh::load_obj(Assets::gpath()+"/models/square.obj");
     colShader = Shader::load(Assets::gpath()+SHADER_FOLDER+"/color.shader");

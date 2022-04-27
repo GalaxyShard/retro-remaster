@@ -174,8 +174,8 @@ Ping4::Ping4()
     Input::add_bind("left", Key::A);
     Input::add_bind("right", Key::D);
 
-    touchInputConn = Input::touch_changed().connect(TYPE_LAMBDA(handle_touch, auto));
-    inputUpdateConn = Renderer::pre_render().connect(CLASS_LAMBDA(input_update));
+    touchInputConn = Input::touch_changed().connect(ARG_LAMBDA(handle_touch));
+    inputUpdateConn = Renderer::pre_render().connect(MK_LAMBDA(input_update));
     
     square = Mesh::load_obj(Assets::gpath()+"/models/square.obj");
 
@@ -247,7 +247,7 @@ Ping4::Ping4()
         else
         {
             gameInProgress = 1;
-            preRenderConn = Renderer::pre_render().connect(CLASS_LAMBDA(pre_render));
+            preRenderConn = Renderer::pre_render().connect(MK_LAMBDA(pre_render));
             toggleGameBtn->texture = restartTex.get();
             velocity = random_unit();
         }

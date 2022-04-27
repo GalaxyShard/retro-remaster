@@ -184,18 +184,18 @@ NetTest::NetTest()
     backgroundPlayer->loop(1);
     backgroundPlayer->play();
 
-    inputConn = Renderer::pre_render().connect(CLASS_LAMBDA(controller_pre_render));
-    touchConn = Input::touch_changed().connect(TYPE_LAMBDA(touch_changed, TouchData));
-    physicsConn = Renderer::post_simulation().connect(CLASS_LAMBDA(post_physics));
+    inputConn = Renderer::pre_render().connect(MK_LAMBDA(controller_pre_render));
+    touchConn = Input::touch_changed().connect(ARG_LAMBDA(touch_changed));
+    physicsConn = Renderer::post_simulation().connect(MK_LAMBDA(post_physics));
 
-    Input::add_bind("grab", Key::F, TYPE_LAMBDA(grab_item, bool));
-    Input::add_bind("jump", Key::Space, TYPE_LAMBDA(set_move_up, bool));
+    Input::add_bind("grab", Key::F, ARG_LAMBDA(grab_item));
+    Input::add_bind("jump", Key::Space, ARG_LAMBDA(set_move_up));
     Input::add_bind("forward", Key::W);
     Input::add_bind("back", Key::S);
     Input::add_bind("left", Key::A);
     Input::add_bind("right", Key::D);
-    Input::add_bind("closer", Key::Q, TYPE_LAMBDA(pull_item, bool));
-    Input::add_bind("further", Key::E, TYPE_LAMBDA(push_item, bool));
+    Input::add_bind("closer", Key::Q, ARG_LAMBDA(pull_item));
+    Input::add_bind("further", Key::E, ARG_LAMBDA(push_item));
     
     cube = Mesh::from_obj(Assets::gpath()+"/models/cube.obj");
     sphere = Mesh::from_obj(Assets::gpath()+"/models/smooth_sphere.obj");
@@ -405,7 +405,7 @@ NetTest::NetTest()
     soundBtn->anchor = Vector2(-1, 1);
     soundBtn->scale = btnScale;
     soundBtn->pos = Vector2(btnScale.x*7, -btnScale.y)/2;
-    soundBtn->onClick = CLASS_LAMBDA(play_audio);
+    soundBtn->onClick = MK_LAMBDA(play_audio);
 
     text_for_img("Play Sound", soundBtn)->scale *= 0.9f;
     UIImage *crossheir = new UIImage();
