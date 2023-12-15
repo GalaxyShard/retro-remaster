@@ -3,6 +3,3 @@ bin/
 **.DS_Store
 
 private.cmake
-
-# Symbolic link, ignore it
-CMakeLists.txt
