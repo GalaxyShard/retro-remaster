@@ -1,6 +1,6 @@
 
-set(OUT_NAME "Retro Collection")
-set(BUNDLE_ID "com.galaxyshard.retrocollection-test")
+set(OUT_NAME "Retro Remaster")
+set(BUNDLE_ID "com.galaxyshard.retro-remaster-test")
 
 include(private.cmake OPTIONAL)
 

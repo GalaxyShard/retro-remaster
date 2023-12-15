@@ -2,7 +2,7 @@
 #include <global.hpp>
 #include <GeometryDash/dash.hpp>
 
-const char *gameName = "Retro Collection";
+const char *gameName = "Retro Remaster";
 Scene *globalScene;
 
 // for gitpod:
@@ -113,7 +113,7 @@ StartScene::StartScene()
     topBar->scale = Vector2(2, 0.35);
     topBar->tint = Vector4(0.85,0.85,0.85,1);
     topBar->scaleToFit = 1;
-    UIText *title = UIText::create("Retro Collection");
+    UIText *title = UIText::create("Retro Remaster");
     title->group = UIGroup::safeArea;
     title->anchor = Vector2(0, 1);
     title->pivot = Vector2(0,1);
