@@ -1,0 +1,3 @@
+[submodule "galaxy-engine-cpp"]
+	path = galaxy-engine-cpp
+	url = https://github.com/GalaxyShard/galaxy-engine-cpp.git

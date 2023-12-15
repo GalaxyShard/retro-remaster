@@ -23,8 +23,8 @@ if (IOS OR IOS_VSC) # Set on command line -DIOS=1 or -DIOS_VSC=1 (for generating
     add_link_options(-arch arm64)
 endif()
 
-project("program" LANGUAGES C CXX OBJC OBJCXX)
 cmake_minimum_required(VERSION 3.19.7, FATAL_ERROR)
+project("program" LANGUAGES C CXX OBJC OBJCXX)
 set(CMAKE_CXX_STANDARD 17)
 
 if (APPLE AND NOT IOS)
@@ -48,7 +48,7 @@ checkvar(GAME_SRC)
 checkvar(BUNDLE_ID)
 
 if (NOT DEFINED ENGINE_ROOT)
-    set(ENGINE_ROOT "$ENV{HOME}/Projects/Galaxy-Engine")
+    set(ENGINE_ROOT "${proj_dir}/galaxy-engine-cpp")
 endif()
 
 include_directories(${ENGINE_ROOT}/include)
